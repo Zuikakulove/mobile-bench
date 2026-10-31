@@ -7,6 +7,8 @@ typedef void (^MBProgressHandler)(NSInteger step, NSInteger totalSteps, NSIntege
                                   NSString *testName, BOOL warmup);
 
 /// core の mb::Runner を包む Objective-C++ ブリッジ。計測ロジックは持たない。
+/// run と cancel を別スレッドから呼んでよい (cancel は core 側で atomic)。
+NS_SWIFT_SENDABLE
 @interface MBBenchmarkBridge : NSObject
 
 - (instancetype)initWithDeviceInfo:(NSDictionary<NSString *, NSString *> *)deviceInfo

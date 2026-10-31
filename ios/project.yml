@@ -21,9 +21,7 @@ targets:
       - path: MobileBench
       # Android / Linux と同一の core ソースをそのままコンパイルする
       - path: ../core/src
-        group: core
       - path: ../core/include
-        group: core
         buildPhase: none
     settings:
       base:

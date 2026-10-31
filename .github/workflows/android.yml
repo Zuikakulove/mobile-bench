@@ -6,6 +6,7 @@ on:
       - "android/**"
       - "core/**"
       - ".github/workflows/android.yml"
+      - ".github/scripts/**"
   pull_request:
     paths:
       - "android/**"
@@ -42,6 +43,10 @@ jobs:
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
+
+      - name: Verify core compile flags (-O2)
+        working-directory: .
+        run: python3 .github/scripts/check_android_flags.py
 
       - name: Rename APK
         id: apk

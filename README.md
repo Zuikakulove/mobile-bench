@@ -118,6 +118,7 @@ big.LITTLE 構成（速いコアと遅いコアが混在）でも、速いコア
    - iOS：`ios/project.yml`（`GCC_OPTIMIZATION_LEVEL=2`。Debug / Release 共通）
    - どちらも `MB_FLAGS_PROFILE=1` を定義します。未定義だと `build_profile.h` が `#error` でビルドを止めます。
    - 実際に最適化が有効だったか（`__OPTIMIZE__`）とコンパイラ名を JSON の `build` に記録します。
+   - CI でも検査します：Android は `compile_commands.json` から core の全ソースが `-O2 -ffp-contract=on -DMB_FLAGS_PROFILE=1` でコンパイルされたことを確認し（`.github/scripts/check_android_flags.py`）、iOS は Xcode のビルド設定をログに出力します。
 3. **最適化で処理が消されない工夫**：入力値を `launder()`（インライン asm）でコンパイラから「不明」に見せて定数畳み込みを防ぎ、結果は `do_not_optimize()` で使われたことにします。
 4. **チェックサムによる自己検証**：各テストは計算結果のチェックサム（素数の個数、行列積の重み付き総和）を返し、毎回期待値と照合します。不一致なら `valid: false` になり、総合スコアは 0 になります。
    処理を省略されていないことと、両 OS で同じ計算をしたことが毎回の計測で保証されます。

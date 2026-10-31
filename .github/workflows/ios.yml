@@ -1,0 +1,53 @@
+name: iOS
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - "core/**"
+      - ".github/workflows/ios.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - "core/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+jobs:
+  simulator-build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Core unit tests (Apple clang)
+        # Android と同じ core を Apple clang でもテストし、チェックサムの一致を確認する
+        run: |
+          cmake -S core -B build-core -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-core --parallel
+          ctest --test-dir build-core --output-on-failure
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Show core compile settings
+        working-directory: ios
+        run: |
+          xcodebuild -project MobileBench.xcodeproj -scheme MobileBench -configuration Debug \
+            -sdk iphonesimulator -showBuildSettings \
+            | grep -E "GCC_OPTIMIZATION_LEVEL|OTHER_CFLAGS|OTHER_CPLUSPLUSFLAGS|GCC_PREPROCESSOR_DEFINITIONS|CLANG_CXX_LANGUAGE_STANDARD"
+
+      - name: Build for iOS Simulator (unsigned)
+        working-directory: ios
+        run: |
+          xcodebuild -project MobileBench.xcodeproj -scheme MobileBench -configuration Debug \
+            -sdk iphonesimulator -destination "generic/platform=iOS Simulator" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build

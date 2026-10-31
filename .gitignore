@@ -1,0 +1,21 @@
+# core
+/build*/
+core/build*/
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/local.properties
+android/.idea/
+android/dist/
+*.iml
+
+# iOS (Xcode プロジェクトは XcodeGen で生成する)
+ios/*.xcodeproj/
+ios/build/
+DerivedData/
+xcuserdata/
+
+.DS_Store

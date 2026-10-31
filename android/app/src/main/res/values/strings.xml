@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MobileBench</string>
+    <string name="start">計測開始</string>
+    <string name="cancel">中止</string>
+    <string name="idle_hint">「計測開始」を押すと CPU テストを実行します (数十秒かかります)。充電中・高温時はスコアが変わることがあります。</string>
+    <string name="running_hint">計測中は他のアプリを操作しないでください。</string>
+    <string name="phase_warmup">ウォームアップ</string>
+    <string name="phase_measure">本計測</string>
+    <string name="overall_score">総合スコア</string>
+    <string name="invalid">一部のテストが無効です (チェックサム不一致)</string>
+    <string name="cancelled">中止されました</string>
+    <string name="failed">エラー: %1$s</string>
+    <string name="show_json">結果 JSON を表示</string>
+    <string name="hide_json">結果 JSON を隠す</string>
+</resources>

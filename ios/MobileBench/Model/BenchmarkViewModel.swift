@@ -36,7 +36,8 @@ final class BenchmarkViewModel: ObservableObject {
 
         // 計測は UI (メイン) スレッドをブロックしないよう専用スレッドで実行する。
         // QoS は core のワーカースレッドと同じ userInitiated。
-        let thread = Thread { [weak self] in
+        // (ViewModel はアプリと同じ寿命なので self は強参照でよい)
+        let thread = Thread {
             let json = bridge.run { step, total, testIndex, testCount, testName, warmup in
                 let info = RunningInfo(
                     fraction: total > 0 ? Double(step) / Double(total) : 0,
@@ -46,12 +47,12 @@ final class BenchmarkViewModel: ObservableObject {
                     warmup: warmup
                 )
                 Task { @MainActor in
-                    guard let self, self.isRunning else { return }
+                    guard self.isRunning else { return }
                     self.state = .running(info)
                 }
             }
             Task { @MainActor in
-                self?.finish(json)
+                self.finish(json)
             }
         }
         thread.qualityOfService = .userInitiated

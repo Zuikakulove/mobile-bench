@@ -31,9 +31,9 @@ NSString *ErrorJson(NSString *message) {
   if ((self = [super init])) {
     mb::RunConfig config;
     config.scratch_dir = ToStd(scratchDir);
-    [deviceInfo enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSString *value, BOOL *stop) {
-      config.device[ToStd(key)] = ToStd(value);
-    }];
+    for (NSString *key in deviceInfo) {
+      config.device[ToStd(key)] = ToStd(deviceInfo[key]);
+    }
     _runner = std::make_unique<mb::Runner>(std::move(config));
   }
   return self;

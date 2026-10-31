@@ -37,14 +37,18 @@ class NativeBench(device: Map<String, String>, scratchDir: String) : AutoCloseab
         return NativeLib.nativeRun(h, listener).toString(Charsets.UTF_8)
     }
 
-    fun cancel() = synchronized(lock) {
-        if (handle != 0L) NativeLib.nativeCancel(handle)
+    fun cancel() {
+        synchronized(lock) {
+            if (handle != 0L) NativeLib.nativeCancel(handle)
+        }
     }
 
-    override fun close() = synchronized(lock) {
-        if (handle != 0L) {
-            NativeLib.nativeDestroy(handle)
-            handle = 0L
+    override fun close() {
+        synchronized(lock) {
+            if (handle != 0L) {
+                NativeLib.nativeDestroy(handle)
+                handle = 0L
+            }
         }
     }
 }

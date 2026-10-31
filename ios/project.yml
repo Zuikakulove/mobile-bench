@@ -45,8 +45,10 @@ targets:
         # Debug / Release どちらの構成でも -O2 にする。
         GCC_OPTIMIZATION_LEVEL: "2"
         OTHER_CFLAGS:
+          - $(inherited)
           - -ffp-contract=on
         GCC_PREPROCESSOR_DEFINITIONS:
+          - $(inherited)
           - MB_FLAGS_PROFILE=1
         # ---------------------------------------------------------------------
         # 署名は CI のシミュレータビルドでは無効化する (xcodebuild 側で指定)

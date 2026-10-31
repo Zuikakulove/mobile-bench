@@ -30,17 +30,30 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
     private val _state = MutableStateFlow<UiState>(UiState.Idle)
     val state: StateFlow<UiState> = _state.asStateFlow()
 
+    /** 診断モード (行列サイズ掃引・周波数の定期記録)。スコアには影響しない。 */
+    private val _diagnostics = MutableStateFlow(false)
+    val diagnostics: StateFlow<Boolean> = _diagnostics.asStateFlow()
+
+    fun setDiagnostics(enabled: Boolean) {
+        if (_state.value !is UiState.Running) _diagnostics.value = enabled
+    }
+
     @Volatile
     private var current: NativeBench? = null
 
     fun start() {
         if (_state.value is UiState.Running) return
         _state.value = UiState.Running(0f, "", 0, 0, true)
+        val diagnosticsEnabled = _diagnostics.value
         viewModelScope.launch {
             // 計測は UI スレッドをブロックしないよう Default ディスパッチャ (ワーカースレッド) で実行
             val json = withContext(Dispatchers.Default) {
                 runCatching {
-                    NativeBench(deviceInfo(), getApplication<Application>().cacheDir.absolutePath).use { bench ->
+                    NativeBench(
+                        deviceInfo(),
+                        getApplication<Application>().cacheDir.absolutePath,
+                        diagnosticsEnabled,
+                    ).use { bench ->
                         current = bench
                         try {
                             bench.run { step, total, testIndex, testCount, testName, warmup ->
@@ -89,12 +102,8 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
             put("soc_manufacturer", Build.SOC_MANUFACTURER)
             put("soc_model", Build.SOC_MODEL)
         }
-        put("app_version", BuildConfigCompat.versionName(getApplication()))
+        put("app_version", BuildConfig.VERSION_NAME)
+        put("app_build", BuildConfig.VERSION_CODE.toString())
+        put("git_sha", BuildConfig.GIT_SHA)
     }
-}
-
-private object BuildConfigCompat {
-    fun versionName(app: Application): String = runCatching {
-        app.packageManager.getPackageInfo(app.packageName, 0).versionName ?: ""
-    }.getOrDefault("")
 }

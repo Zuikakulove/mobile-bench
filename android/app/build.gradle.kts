@@ -4,6 +4,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// GitHub Actions の実行番号 (android.yml の run_number) をビルド番号にする。
+// versionCode が毎回増えるので、新しい APK をそのまま上書きインストールできる。
+// ローカルビルドでは 1 (CI のどのビルドよりも古い扱い)。
+val ciRunNumber: Int? = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+val gitShortSha: String = System.getenv("GITHUB_SHA")?.take(7) ?: "local"
+
 android {
     namespace = "com.mobilebench.app"
     compileSdk = 35
@@ -14,8 +20,10 @@ android {
         applicationId = "com.mobilebench.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = ciRunNumber ?: 1
+        versionName = "0.1.1"
+        buildConfigField("int", "BUILD_NUMBER", (ciRunNumber ?: 0).toString())
+        buildConfigField("String", "GIT_SHA", "\"$gitShortSha\"")
 
         ndk {
             // 64bit のみ。arm64-v8a = 実機、x86_64 = エミュレータ
@@ -66,6 +74,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

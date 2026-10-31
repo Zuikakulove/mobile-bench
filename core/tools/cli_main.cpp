@@ -1,5 +1,5 @@
 // Linux / macOS 用のコマンドラインランナー。
-//   mobilebench_cli [--only <id-prefix>]... [--threads N] [--compact] [--quiet]
+//   mobilebench_cli [--only <id-prefix>]... [--threads N] [--diagnostics] [--compact] [--quiet]
 // 結果の JSON を標準出力に、進捗を標準エラーに出す。
 #include <cstdio>
 #include <cstdlib>
@@ -21,8 +21,10 @@ int main(int argc, char** argv) {
       pretty = false;
     } else if (std::strcmp(argv[i], "--quiet") == 0) {
       quiet = true;
+    } else if (std::strcmp(argv[i], "--diagnostics") == 0) {
+      config.diagnostics = true;
     } else {
-      std::fprintf(stderr, "usage: %s [--only <id-prefix>]... [--threads N] [--compact] [--quiet]\n", argv[0]);
+      std::fprintf(stderr, "usage: %s [--only <id-prefix>]... [--threads N] [--diagnostics] [--compact] [--quiet]\n", argv[0]);
       return 2;
     }
   }

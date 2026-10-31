@@ -15,3 +15,11 @@ if(MB_BUILD_CLI)
   add_test(NAME cli_smoke COMMAND mobilebench_cli --only cpu.single.sieve --quiet --compact)
   set_tests_properties(cli_smoke PROPERTIES PASS_REGULAR_EXPRESSION "\"valid\":true")
 endif()
+
+if(MB_BUILD_CLI)
+  # 診断モード (行列サイズ掃引) が動き、結果が JSON に出ることを確認
+  add_test(NAME cli_diagnostics COMMAND mobilebench_cli --only cpu.single.sieve --diagnostics --quiet --compact)
+  set_tests_properties(cli_diagnostics PROPERTIES
+    PASS_REGULAR_EXPRESSION "\"matmul_sweep\":\\[\\{\"n\":64.*\"n\":768"
+    TIMEOUT 300)
+endif()

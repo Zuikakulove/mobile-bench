@@ -5,6 +5,8 @@
 
 #include "mobilebench/build_profile.h"
 #include "mobilebench/version.h"
+#include "diagnostics.h"
+#include "freq_sampler.h"
 #include "platform.h"
 
 namespace mb {
@@ -35,16 +37,24 @@ BuildInfo current_build_info() {
 
 int logical_core_count() { return platform::logical_cpu_count(); }
 
+CpuTopology current_cpu_topology() { return platform::read_cpu_topology(platform::logical_cpu_count()); }
+
 Runner::Runner(RunConfig config) : config_(std::move(config)) {}
 
 SuiteResult Runner::run(const ProgressCallback& progress) {
-  return run_tests(create_default_suite(config_), progress);
+  return run_impl(create_default_suite(config_), progress, kWarmupRuns, kMeasuredRuns, config_.diagnostics);
 }
 
 std::string Runner::run_json(const ProgressCallback& progress) { return to_json(run(progress)); }
 
 SuiteResult Runner::run_tests(std::vector<TestPtr> tests, const ProgressCallback& progress,
                               int warmup_runs, int measured_runs) {
+  return run_impl(std::move(tests), progress, warmup_runs, measured_runs, /*diagnostics=*/false);
+}
+
+SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback& progress, int warmup_runs,
+                             int measured_runs, bool diagnostics) {
+  const std::int64_t suite_t0 = now_ns();
   SuiteResult suite;
   suite.benchmark_version = kBenchmarkVersion;
   suite.build = current_build_info();
@@ -52,6 +62,11 @@ SuiteResult Runner::run_tests(std::vector<TestPtr> tests, const ProgressCallback
   suite.warmup_runs = warmup_runs;
   suite.measured_runs = measured_runs;
   suite.logical_cores = logical_core_count();
+  suite.topology = platform::read_cpu_topology(suite.logical_cores);
+  suite.diagnostics_enabled = diagnostics;
+
+  detail::FreqSampler sampler;
+  if (diagnostics) sampler.start(suite.logical_cores, /*interval_ms=*/100, suite_t0);
 
   TestContext ctx;
   ctx.threads = config_.threads > 0 ? config_.threads : suite.logical_cores;
@@ -60,7 +75,7 @@ SuiteResult Runner::run_tests(std::vector<TestPtr> tests, const ProgressCallback
   const int runs_per_test = warmup_runs + measured_runs;
   Progress p;
   p.test_count = static_cast<int>(tests.size());
-  p.total_steps = p.test_count * runs_per_test;
+  p.total_steps = p.test_count * runs_per_test + (diagnostics ? detail::matmul_sweep_steps() : 0);
 
   auto report = [&] {
     if (progress) progress(p);
@@ -93,9 +108,21 @@ SuiteResult Runner::run_tests(std::vector<TestPtr> tests, const ProgressCallback
         p.warmup = run < warmup_runs;
         report();
 
+        RunDetail detail;
+        detail.warmup = run < warmup_runs;
+        test.before_run();  // クロック推定 (計測区間外)
+        detail.cpu_khz_before = platform::read_cpu_cur_khz(suite.logical_cores);
+
         const std::int64_t start = now_ns();
         const std::uint64_t checksum = test.run_once();
         const std::int64_t elapsed = now_ns() - start;
+
+        detail.cpu_khz_after = platform::read_cpu_cur_khz(suite.logical_cores);
+        test.after_run();   // クロック推定 (計測区間外)
+        detail.ns = elapsed;
+        detail.t_start_ms = (start - suite_t0) / 1'000'000;
+        detail.telemetry = test.take_telemetry();
+        r.run_details.push_back(std::move(detail));
 
         r.checksum = checksum;
         if (checksum != r.expected_checksum) all_match = false;
@@ -126,6 +153,24 @@ SuiteResult Runner::run_tests(std::vector<TestPtr> tests, const ProgressCallback
     r.score = r.valid ? compute_score(r.reference_ns, r.median_ns) : 0.0;
     suite.tests.push_back(std::move(r));
   }
+
+  // 診断モード: スコア対象外の行列サイズ掃引
+  if (diagnostics && !cancelled_.load()) {
+    p.test_index = p.test_count;
+    p.test_id = "diagnostics";
+    try {
+      suite.diagnostics.matmul_sweep =
+          detail::run_matmul_sweep(ctx.threads, cancelled_, [&](const std::string& label, bool warmup) {
+            p.test_name = label;
+            p.warmup = warmup;
+            report();
+            ++p.step;
+          });
+    } catch (...) {
+      // 診断の失敗はスコアに影響させない
+    }
+  }
+  suite.diagnostics.freq = sampler.stop();
 
   suite.cancelled = cancelled_.load();
   std::vector<double> scores;

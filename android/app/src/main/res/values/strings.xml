@@ -13,4 +13,14 @@
     <string name="failed">エラー: %1$s</string>
     <string name="show_json">結果 JSON を表示</string>
     <string name="hide_json">結果 JSON を隠す</string>
+    <string name="build_label">アプリ %1$s (build %2$d · %3$s)</string>
+    <string name="diagnostics_label">診断モード (行列サイズ掃引・クロック記録。スコアには影響しません。+数秒)</string>
+    <string name="show_runs">各回の内訳を表示</string>
+    <string name="hide_runs">各回の内訳を隠す</string>
+    <string name="sweep_title">診断: 行列サイズとキャッシュ</string>
+    <string name="sweep_hint">WS = 作業領域 (A+B+C)。MT はスレッドごとに C を持つ。サイズが L2 を超えると GF (GFLOPS) が下がるかを見る。</string>
+    <string name="freq_samples">周波数サンプル数: %1$d (0 の場合はこの端末では読み取り不可)</string>
+    <string name="copy_json">JSON をコピー</string>
+    <string name="share_json">共有</string>
+    <string name="copied">コピーしました</string>
 </resources>

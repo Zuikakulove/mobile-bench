@@ -21,6 +21,9 @@ endforeach()
 find_package(Threads REQUIRED)
 
 add_library(mobilebench_core STATIC
+  src/clock_probe.cpp
+  src/diagnostics.cpp
+  src/freq_sampler.cpp
   src/platform.cpp
   src/registry.cpp
   src/result_json.cpp

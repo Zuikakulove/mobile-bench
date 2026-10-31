@@ -34,6 +34,9 @@ struct RunConfig {
   std::string scratch_dir;
   std::map<std::string, std::string> device;  // JSON の "device" にそのまま入る
   std::vector<std::string> only;              // 空 = 全テスト。ID の前方一致で絞り込み
+  // 診断モード: スコア対象のテストの後に行列サイズ掃引を行い、
+  // 計測中の各コア周波数を定期記録する (スコアには影響しない)
+  bool diagnostics = false;
 };
 
 class Runner {
@@ -54,6 +57,9 @@ class Runner {
   void cancel() { cancelled_.store(true); }
 
  private:
+  SuiteResult run_impl(std::vector<TestPtr> tests, const ProgressCallback& progress, int warmup_runs,
+                       int measured_runs, bool diagnostics);
+
   RunConfig config_;
   std::atomic<bool> cancelled_{false};
 };
@@ -67,6 +73,7 @@ double compute_score(std::int64_t reference_ns, std::int64_t measured_ns);
 double geometric_mean(const std::vector<double>& values);
 
 BuildInfo current_build_info();
+CpuTopology current_cpu_topology();
 int logical_core_count();
 
 }  // namespace mb

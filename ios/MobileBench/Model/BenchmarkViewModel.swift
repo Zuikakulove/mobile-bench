@@ -19,6 +19,8 @@ final class BenchmarkViewModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
+    /// 診断モード (行列サイズ掃引など)。スコアには影響しない
+    @Published var diagnostics = false
     private var bridge: MBBenchmarkBridge?
 
     var isRunning: Bool {
@@ -28,7 +30,11 @@ final class BenchmarkViewModel: ObservableObject {
 
     func start() {
         guard !isRunning else { return }
-        let bridge = MBBenchmarkBridge(deviceInfo: Self.deviceInfo(), scratchDir: NSTemporaryDirectory())
+        let bridge = MBBenchmarkBridge(
+            deviceInfo: Self.deviceInfo(),
+            scratchDir: NSTemporaryDirectory(),
+            diagnostics: diagnostics
+        )
         self.bridge = bridge
         state = .running(RunningInfo())
         // 計測中は画面を消さない
@@ -87,7 +93,19 @@ final class BenchmarkViewModel: ObservableObject {
             "model": machine,  // 例: "iPhone15,2" (シミュレータでは "arm64" / "x86_64")
             "model_name": device.model,
             "os_version": device.systemVersion,
-            "app_version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+            "app_version": AppInfo.version,
+            "app_build": AppInfo.build,
         ]
+    }
+}
+
+enum AppInfo {
+    static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
+    }
+
+    /// CI では GitHub Actions の実行番号 (ios.yml で CURRENT_PROJECT_VERSION に渡している)
+    static var build: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
     }
 }

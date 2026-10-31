@@ -166,3 +166,79 @@ TEST(runner_reads_expected_checksum_after_setup) {
   EXPECT_TRUE(r.tests[0].valid);
   EXPECT_EQ(r.tests[0].expected_checksum, 777u);
 }
+
+// ---- 計測内訳 (テレメトリ) -------------------------------------------------------
+
+#include "clock_probe.h"
+
+TEST(single_thread_telemetry_records_each_unit) {
+  detail::UnitBasedTest t({"t", "t", "cpu", 1}, std::make_unique<detail::SieveKernel>(100'000, 9'592), 5, false);
+  TestContext ctx;
+  t.setup(ctx);
+  t.before_run();
+  EXPECT_EQ(t.run_once(), t.expected_checksum());
+  t.after_run();
+  RunTelemetry tel = t.take_telemetry();
+  EXPECT_EQ(tel.unit_ns.size(), 5u);
+  EXPECT_EQ(tel.unit_cpus.size(), 5u);
+  EXPECT_EQ(tel.workers.size(), 1u);
+  EXPECT_EQ(tel.workers[0].units, 5);
+  for (auto ns : tel.unit_ns) EXPECT_TRUE(ns > 0);
+#if defined(__linux__)
+  EXPECT_TRUE(!tel.workers[0].cpus.empty());
+#endif
+#if defined(__x86_64__) || defined(__aarch64__) || defined(__arm64__)
+  EXPECT_TRUE(tel.workers[0].ghz_before > 0.0);
+  EXPECT_TRUE(tel.workers[0].ghz_after > 0.0);
+#endif
+  t.teardown();
+}
+
+TEST(multi_thread_telemetry_accounts_for_all_units) {
+  detail::UnitBasedTest t({"t", "t", "cpu", 1}, std::make_unique<detail::SieveKernel>(100'000, 9'592), 23, true);
+  TestContext ctx;
+  ctx.threads = 3;
+  t.setup(ctx);
+  t.before_run();
+  EXPECT_EQ(t.run_once(), t.expected_checksum());
+  t.after_run();
+  RunTelemetry tel = t.take_telemetry();
+  EXPECT_EQ(tel.workers.size(), 3u);
+  int units = 0;
+  for (const auto& w : tel.workers) {
+    units += w.units;
+    EXPECT_TRUE(w.busy_ns >= 0);
+  }
+  EXPECT_EQ(units, 23);
+  EXPECT_TRUE(tel.unit_ns.empty());
+  t.teardown();
+}
+
+TEST(clock_probe_is_plausible) {
+  const double ghz = detail::estimate_clock_ghz();
+#if defined(__x86_64__) || defined(__aarch64__) || defined(__arm64__)
+  // 即値加算の消去などで値が跳ね上がっていないこと (現実の CPU は 0.3〜7GHz 程度)
+  EXPECT_TRUE(ghz > 0.3 && ghz < 7.0);
+#else
+  EXPECT_EQ(ghz, 0.0);
+#endif
+}
+
+TEST(runner_records_run_details_including_warmup) {
+  std::vector<TestPtr> tests;
+  tests.push_back(std::make_unique<FakeTest>("a", 1'000'000, 1, 1));
+  Runner runner;
+  SuiteResult r = runner.run_tests(std::move(tests), {});
+  EXPECT_EQ(r.tests[0].run_details.size(), static_cast<size_t>(kWarmupRuns + kMeasuredRuns));
+  EXPECT_TRUE(r.tests[0].run_details[0].warmup);
+  EXPECT_TRUE(!r.tests[0].run_details.back().warmup);
+  // run_details の本計測分は runs_ns と一致する
+  for (int i = 0; i < kMeasuredRuns; ++i) {
+    EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
+  }
+  const std::string json = to_json(r, false);
+  EXPECT_TRUE(json.find("\"schema_version\":2") != std::string::npos);
+  EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
+  EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);
+  EXPECT_TRUE(json.find("\"diagnostics\":{") == std::string::npos);  // 診断モードでなければ出さない
+}

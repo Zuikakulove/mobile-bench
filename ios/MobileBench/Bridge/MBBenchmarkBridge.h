@@ -11,8 +11,10 @@ typedef void (^MBProgressHandler)(NSInteger step, NSInteger totalSteps, NSIntege
 NS_SWIFT_SENDABLE
 @interface MBBenchmarkBridge : NSObject
 
+/// diagnostics: 診断モード (行列サイズ掃引など。スコアには影響しない)
 - (instancetype)initWithDeviceInfo:(NSDictionary<NSString *, NSString *> *)deviceInfo
-                        scratchDir:(NSString *)scratchDir NS_DESIGNATED_INITIALIZER;
+                        scratchDir:(NSString *)scratchDir
+                       diagnostics:(BOOL)diagnostics NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
 /// 計測を実行し、core が生成した JSON を返す。呼び出しスレッドをブロックする。

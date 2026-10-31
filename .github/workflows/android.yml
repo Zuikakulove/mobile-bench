@@ -42,6 +42,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
+        # app/build.gradle.kts が GITHUB_RUN_NUMBER を versionCode (ビルド番号) に使う
         run: ./gradlew assembleDebug --stacktrace
 
       - name: Verify core compile flags (-O2)
@@ -52,7 +53,7 @@ jobs:
         id: apk
         run: |
           short_sha="${GITHUB_SHA::7}"
-          name="MobileBench-debug-${short_sha}.apk"
+          name="MobileBench-debug-b${GITHUB_RUN_NUMBER}-${short_sha}.apk"
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk "dist/${name}"
           echo "name=${name}" >> "$GITHUB_OUTPUT"

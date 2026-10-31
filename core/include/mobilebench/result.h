@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "mobilebench/telemetry.h"
+
 namespace mb {
 
 struct TestResult {
@@ -21,6 +23,7 @@ struct TestResult {
   std::uint64_t checksum = 0;
   std::uint64_t expected_checksum = 0;
   std::string error;                  // 例外などで失敗した場合のメッセージ
+  std::vector<RunDetail> run_details; // ウォームアップを含む各回の内訳 (切り分け用)
 };
 
 struct BuildInfo {
@@ -43,6 +46,9 @@ struct SuiteResult {
   double overall_score = 0.0;  // 各テストスコアの幾何平均
   bool valid = false;          // 全テストが valid か
   bool cancelled = false;
+  CpuTopology topology;
+  bool diagnostics_enabled = false;
+  Diagnostics diagnostics;  // diagnostics_enabled のときのみ JSON に出力
 };
 
 std::string to_json(const SuiteResult& result, bool pretty = true);

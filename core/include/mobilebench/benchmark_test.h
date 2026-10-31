@@ -8,6 +8,8 @@
 #include <memory>
 #include <string>
 
+#include "mobilebench/telemetry.h"
+
 namespace mb {
 
 struct TestInfo {
@@ -42,6 +44,13 @@ class BenchmarkTest {
 
   // 正しいチェックサム。setup() の後に呼ばれる (入力データから求めてよい)
   virtual std::uint64_t expected_checksum() const = 0;
+
+  // 計測区間の直前・直後に呼ばれる (計測時間に含まれない)。クロック推定などに使う
+  virtual void before_run() {}
+  virtual void after_run() {}
+
+  // 直近の run_once() の内訳 (after_run() の後に呼ばれる)
+  virtual RunTelemetry take_telemetry() { return {}; }
 
   // 計測対象外の後始末
   virtual void teardown() {}

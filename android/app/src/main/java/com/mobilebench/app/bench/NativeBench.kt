@@ -11,7 +11,12 @@ object NativeLib {
         System.loadLibrary("mobilebench_jni")
     }
 
-    external fun nativeCreate(deviceKeys: Array<String>, deviceValues: Array<String>, scratchDir: String): Long
+    external fun nativeCreate(
+        deviceKeys: Array<String>,
+        deviceValues: Array<String>,
+        scratchDir: String,
+        diagnostics: Boolean,
+    ): Long
     external fun nativeRun(handle: Long, listener: ProgressListener?): ByteArray
     external fun nativeCancel(handle: Long)
     external fun nativeDestroy(handle: Long)
@@ -22,12 +27,13 @@ object NativeLib {
  * [run] は呼び出しスレッドをブロックするので、必ずバックグラウンドから呼ぶこと。
  * [cancel] は任意のスレッドから呼んでよい。
  */
-class NativeBench(device: Map<String, String>, scratchDir: String) : AutoCloseable {
+class NativeBench(device: Map<String, String>, scratchDir: String, diagnostics: Boolean) : AutoCloseable {
     private val lock = Any()
     private var handle: Long = NativeLib.nativeCreate(
         device.keys.toTypedArray(),
         device.values.toTypedArray(),
         scratchDir,
+        diagnostics,
     )
 
     /** 計測を実行し、core が生成した JSON を返す。 */

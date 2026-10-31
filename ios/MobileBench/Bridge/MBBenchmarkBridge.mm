@@ -27,10 +27,12 @@ NSString *ErrorJson(NSString *message) {
 }
 
 - (instancetype)initWithDeviceInfo:(NSDictionary<NSString *, NSString *> *)deviceInfo
-                        scratchDir:(NSString *)scratchDir {
+                        scratchDir:(NSString *)scratchDir
+                       diagnostics:(BOOL)diagnostics {
   if ((self = [super init])) {
     mb::RunConfig config;
     config.scratch_dir = ToStd(scratchDir);
+    config.diagnostics = diagnostics;
     for (NSString *key in deviceInfo) {
       config.device[ToStd(key)] = ToStd(deviceInfo[key]);
     }

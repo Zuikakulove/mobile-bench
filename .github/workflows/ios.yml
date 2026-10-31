@@ -49,5 +49,6 @@ jobs:
           xcodebuild -project MobileBench.xcodeproj -scheme MobileBench -configuration Debug \
             -sdk iphonesimulator -destination "generic/platform=iOS Simulator" \
             -derivedDataPath build \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             build

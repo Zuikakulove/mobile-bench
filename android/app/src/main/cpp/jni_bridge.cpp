@@ -39,9 +39,11 @@ mb::Runner* from_handle(jlong handle) { return reinterpret_cast<mb::Runner*>(han
 }  // namespace
 
 extern "C" JNIEXPORT jlong JNICALL Java_com_mobilebench_app_bench_NativeLib_nativeCreate(
-    JNIEnv* env, jobject /*thiz*/, jobjectArray device_keys, jobjectArray device_values, jstring scratch_dir) {
+    JNIEnv* env, jobject /*thiz*/, jobjectArray device_keys, jobjectArray device_values, jstring scratch_dir,
+    jboolean diagnostics) {
   mb::RunConfig config;
   config.scratch_dir = to_std_string(env, scratch_dir);
+  config.diagnostics = diagnostics == JNI_TRUE;
   const jsize n = env->GetArrayLength(device_keys);
   for (jsize i = 0; i < n; ++i) {
     auto k = static_cast<jstring>(env->GetObjectArrayElement(device_keys, i));

@@ -24,6 +24,8 @@ struct TestResult {
   std::uint64_t expected_checksum = 0;
   std::string error;                  // 例外などで失敗した場合のメッセージ
   std::vector<RunDetail> run_details; // ウォームアップを含む各回の内訳 (切り分け用)
+  Conditions conditions_before;       // テスト開始時の端末の状態
+  Conditions conditions_after;        // テスト終了時の端末の状態
 };
 
 struct BuildInfo {
@@ -49,7 +51,11 @@ struct SuiteResult {
   CpuTopology topology;
   bool diagnostics_enabled = false;
   Diagnostics diagnostics;  // diagnostics_enabled のときのみ JSON に出力
+  std::string summary_text; // 人が読む / チャットに貼るための要約 (summary.cpp)
 };
+
+// 要約テキストを作る (Runner が自動で summary_text に入れる)
+std::string make_summary_text(const SuiteResult& result);
 
 std::string to_json(const SuiteResult& result, bool pretty = true);
 

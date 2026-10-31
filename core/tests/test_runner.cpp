@@ -237,8 +237,42 @@ TEST(runner_records_run_details_including_warmup) {
     EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
   }
   const std::string json = to_json(r, false);
-  EXPECT_TRUE(json.find("\"schema_version\":2") != std::string::npos);
+  EXPECT_TRUE(json.find("\"schema_version\":3") != std::string::npos);
   EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
   EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);
   EXPECT_TRUE(json.find("\"diagnostics\":{") == std::string::npos);  // 診断モードでなければ出さない
+}
+
+TEST(runner_records_conditions_and_summary) {
+  std::vector<TestPtr> tests;
+  tests.push_back(std::make_unique<FakeTest>("cpu.fake", 1'000'000, 1, 1));
+  Runner runner;
+  int calls = 0;
+  runner.set_condition_probe([&] {
+    ++calls;
+    return Conditions{{"thermal_status", std::to_string(calls)}, {"power_save", "false"}};
+  });
+  SuiteResult r = runner.run_tests(std::move(tests), {});
+  EXPECT_EQ(calls, 2);  // テスト開始時と終了時
+  EXPECT_EQ(r.tests[0].conditions_before.at("thermal_status"), std::string("1"));
+  EXPECT_EQ(r.tests[0].conditions_after.at("thermal_status"), std::string("2"));
+  // 要約: テスト ID、状態、各回の行が入る
+  EXPECT_TRUE(r.summary_text.find("[cpu.fake] median") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("cond power_save=false thermal_status=1 -> power_save=false thermal_status=2") !=
+              std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("  W ") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("  #5 ") != std::string::npos);
+  const std::string json = to_json(r, true);
+  EXPECT_TRUE(json.find("\"summary_text\": \"MobileBench v") != std::string::npos);
+  EXPECT_TRUE(json.find("\"thermal_status\": \"1\"") != std::string::npos);
+}
+
+TEST(pretty_json_keeps_number_arrays_on_one_line) {
+  SuiteResult r;
+  TestResult t;
+  t.id = "x";
+  t.runs_ns = {1, 2, 3};
+  r.tests.push_back(t);
+  const std::string json = to_json(r, true);
+  EXPECT_TRUE(json.find("\"runs_ns\": [1, 2, 3]") != std::string::npos);
 }

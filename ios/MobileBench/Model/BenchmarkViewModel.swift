@@ -35,6 +35,7 @@ final class BenchmarkViewModel: ObservableObject {
             scratchDir: NSTemporaryDirectory(),
             diagnostics: diagnostics
         )
+        bridge.conditionProvider = Self.makeConditionProvider()
         self.bridge = bridge
         state = .running(RunningInfo())
         // 計測中は画面を消さない
@@ -78,6 +79,30 @@ final class BenchmarkViewModel: ObservableObject {
         } catch {
             state = .failed(error.localizedDescription, rawJson: json)
         }
+    }
+
+    /// 端末の状態を iOS の公式 API で取得する (計測スレッドから呼ばれる。ProcessInfo はスレッドセーフ)。
+    /// - thermal_state: nominal が通常。fair / serious / critical と上がるほど性能が制限される
+    /// - low_power: 低電力モード
+    /// MainActor の外で closure を作る (計測スレッドから呼ばれるため、MainActor に隔離させない)
+    nonisolated private static func makeConditionProvider() -> @Sendable () -> [String: String] {
+        { currentConditions() }
+    }
+
+    nonisolated private static func currentConditions() -> [String: String] {
+        let info = ProcessInfo.processInfo
+        let thermal: String
+        switch info.thermalState {
+        case .nominal: thermal = "nominal"
+        case .fair: thermal = "fair"
+        case .serious: thermal = "serious"
+        case .critical: thermal = "critical"
+        @unknown default: thermal = "unknown"
+        }
+        return [
+            "thermal_state": thermal,
+            "low_power": info.isLowPowerModeEnabled ? "true" : "false",
+        ]
     }
 
     private static func deviceInfo() -> [String: String] {

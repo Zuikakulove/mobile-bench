@@ -7,6 +7,7 @@
 #pragma once
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,7 @@ struct RunDetail {
   std::int64_t t_start_ms = 0;               // スイート開始からの経過時間
   std::vector<std::int64_t> cpu_khz_before;  // 計測直前の各コア周波数 (OS 報告値, -1 = 読めない)
   std::vector<std::int64_t> cpu_khz_after;   // 計測直後の各コア周波数
+  std::vector<std::int64_t> cpu_cap_khz;     // 計測直前の各コアの周波数上限 (scaling_max_freq)
   RunTelemetry telemetry;
 };
 
@@ -82,9 +84,14 @@ struct FreqSamples {
   std::vector<std::vector<std::int64_t>> khz;    // [sample][cpu]
 };
 
+// 端末の状態 (発熱状態・省電力・充電など)。プラットフォーム層が OS の公式 API で取得して渡す
+using Conditions = std::map<std::string, std::string>;
+
 struct Diagnostics {
   std::vector<MatmulSweepPoint> matmul_sweep;
   FreqSamples freq;
+  Conditions conditions_before;
+  Conditions conditions_after;
 };
 
 }  // namespace mb

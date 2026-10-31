@@ -9,7 +9,7 @@ using detail::JsonWriter;
 
 template <class T>
 void write_int_array(JsonWriter& w, const std::vector<T>& values) {
-  w.begin_array();
+  w.begin_inline_array();
   for (auto v : values) w.value(static_cast<std::int64_t>(v));
   w.end_array();
 }
@@ -41,6 +41,16 @@ void write_run_detail(JsonWriter& w, const RunDetail& d) {
   w.key("workers"); write_workers(w, d.telemetry.workers);
   w.key("cpu_khz_before"); write_int_array(w, d.cpu_khz_before);
   w.key("cpu_khz_after"); write_int_array(w, d.cpu_khz_after);
+  w.key("cpu_cap_khz"); write_int_array(w, d.cpu_cap_khz);
+  w.end_object();
+}
+
+void write_conditions(JsonWriter& w, const Conditions& c) {
+  w.begin_object();
+  for (const auto& [k, v] : c) {
+    w.key(k);
+    w.value(v);
+  }
   w.end_object();
 }
 
@@ -98,6 +108,8 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
     w.end_object();
   }
   w.end_array();
+  w.key("conditions_before"); write_conditions(w, d.conditions_before);
+  w.key("conditions_after"); write_conditions(w, d.conditions_after);
   w.key("freq_samples");
   w.begin_object();
   w.key("interval_ms"); w.value(d.freq.interval_ms);
@@ -115,7 +127,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // JSON スキーマ (schema_version を変えたら UI 側のパーサも更新すること)
 //
 // {
-//   "schema_version": 2,
+//   "schema_version": 3,
 //   "benchmark_version": "0.1.0",
 //   "score_formula": "reference_ns / median_ns * 1000",
 //   "overall_score": 1234.567,          // 各テストスコアの幾何平均
@@ -134,10 +146,12 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 //   "diagnostics": { "matmul_sweep": [...], "freq_samples": {...} }   // 診断モード時のみ
 // }
 // schema 2 (benchmark 0.1.1): run_details / cpu_topology / diagnostics を追加
+// schema 3 (benchmark 0.1.1): cpu_cap_khz / conditions_before,after / summary_text を追加。
+//                             数値配列を 1 行で出力 (計測区間は変更なし)
 std::string to_json(const SuiteResult& r, bool pretty) {
   detail::JsonWriter w(pretty);
   w.begin_object();
-  w.key("schema_version"); w.value(2);
+  w.key("schema_version"); w.value(3);
   w.key("benchmark_version"); w.value(r.benchmark_version);
   w.key("score_formula"); w.value("reference_ns / median_ns * 1000");
   w.key("overall_score"); w.value_fixed(r.overall_score, 3);
@@ -184,7 +198,7 @@ std::string to_json(const SuiteResult& r, bool pretty) {
     w.key("reference_ns"); w.value(t.reference_ns);
     w.key("warmup_ns"); w.value(t.warmup_ns);
     w.key("runs_ns");
-    w.begin_array();
+    w.begin_inline_array();
     for (auto ns : t.runs_ns) w.value(ns);
     w.end_array();
     w.key("median_ns"); w.value(t.median_ns);
@@ -197,6 +211,8 @@ std::string to_json(const SuiteResult& r, bool pretty) {
       w.key("error");
       w.value(t.error);
     }
+    w.key("conditions_before"); write_conditions(w, t.conditions_before);
+    w.key("conditions_after"); write_conditions(w, t.conditions_after);
     w.key("run_details");
     w.begin_array();
     for (const auto& d : t.run_details) write_run_detail(w, d);
@@ -209,6 +225,9 @@ std::string to_json(const SuiteResult& r, bool pretty) {
     w.key("diagnostics");
     write_diagnostics(w, r.diagnostics);
   }
+
+  // チャット等に貼るための要約 (内容は JSON の他のフィールドと同じ情報)
+  w.key("summary_text"); w.value(r.summary_text);
 
   w.end_object();
   return w.str();

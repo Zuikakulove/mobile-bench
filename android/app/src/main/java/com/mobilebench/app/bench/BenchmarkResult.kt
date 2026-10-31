@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * core が返す JSON (schema_version 2) の表示用モデル。
+ * core が返す JSON (schema_version 3) の表示用モデル。
  * スコア計算などは一切行わず、JSON の値を読んで表示しやすい形にまとめるだけ。
  */
 data class BenchmarkResult(
@@ -18,6 +18,7 @@ data class BenchmarkResult(
     val topology: Topology,
     val sweep: List<SweepPoint>,
     val freqSampleCount: Int,
+    val summaryText: String,
 ) {
     data class TestEntry(
         val id: String,
@@ -89,6 +90,7 @@ data class BenchmarkResult(
                 topology = parseTopology(root.optJSONObject("cpu_topology")),
                 sweep = diag?.optJSONArray("matmul_sweep")?.objects()?.map(::parseSweep).orEmpty(),
                 freqSampleCount = diag?.optJSONObject("freq_samples")?.optJSONArray("t_ms")?.length() ?: 0,
+                summaryText = root.optString("summary_text"),
             )
         }
 

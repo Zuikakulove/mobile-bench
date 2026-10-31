@@ -17,6 +17,10 @@ NS_SWIFT_SENDABLE
                        diagnostics:(BOOL)diagnostics NS_DESIGNATED_INITIALIZER;
 - (instancetype)init NS_UNAVAILABLE;
 
+/// 端末の状態 (発熱状態・低電力モードなど) を返す。各テストの開始・終了時に計測スレッドから呼ばれる。
+/// run の前に設定すること。
+@property(nonatomic, copy, nullable) NSDictionary<NSString *, NSString *> * (^conditionProvider)(void);
+
 /// 計測を実行し、core が生成した JSON を返す。呼び出しスレッドをブロックする。
 - (NSString *)runWithProgress:(nullable MBProgressHandler)progress;
 

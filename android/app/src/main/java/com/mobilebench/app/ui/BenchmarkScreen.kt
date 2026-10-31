@@ -154,7 +154,7 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
         }
     }
 
-    JsonActions(rawJson)
+    JsonActions(rawJson, result.summaryText)
 
     result.tests.forEach { t -> TestCard(t) }
 
@@ -236,10 +236,17 @@ private fun SweepTable(result: BenchmarkResult) {
 }
 
 @Composable
-private fun JsonActions(rawJson: String) {
+private fun JsonActions(rawJson: String, summary: String) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.copied)
+    // 要約 (数 KB) はチャットに貼っても切れない。JSON 全体は大きいので共有 (ファイル送信等) 向け
+    if (summary.isNotEmpty()) {
+        Button(onClick = {
+            clipboard.setText(AnnotatedString(summary))
+            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+        }) { Text(stringResource(R.string.copy_summary)) }
+    }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = {
             clipboard.setText(AnnotatedString(rawJson))

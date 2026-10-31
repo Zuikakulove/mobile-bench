@@ -29,6 +29,9 @@ int current_cpu();
 // 読めないコアは -1。どのコアも読めない (iOS や SELinux で拒否) 場合は空。
 std::vector<std::int64_t> read_cpu_cur_khz(int cpu_count);
 
+// 各コアの現在の周波数上限 [kHz] (scaling_max_freq。発熱・省電力で下げられる)。形式は同上
+std::vector<std::int64_t> read_cpu_cap_khz(int cpu_count);
+
 // CPU 構成 (最大周波数・capacity・キャッシュ)。取れるものだけ埋める。
 CpuTopology read_cpu_topology(int cpu_count);
 

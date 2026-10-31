@@ -29,6 +29,7 @@ add_library(mobilebench_core STATIC
   src/result_json.cpp
   src/runner.cpp
   src/stats.cpp
+  src/summary.cpp
   src/worker_pool.cpp
   src/tests/cpu_matmul.cpp
   src/tests/cpu_sieve.cpp

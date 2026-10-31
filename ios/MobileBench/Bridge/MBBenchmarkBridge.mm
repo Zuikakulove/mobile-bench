@@ -42,16 +42,32 @@ NSString *ErrorJson(NSString *message) {
 }
 
 - (NSString *)runWithProgress:(MBProgressHandler)progress {
+  NSDictionary<NSString *, NSString *> * (^provider)(void) = self.conditionProvider;
+  if (provider) {
+    _runner->set_condition_probe([provider]() {
+      mb::Conditions out;
+      @autoreleasepool {
+        NSDictionary<NSString *, NSString *> *dict = provider();
+        for (NSString *key in dict) {
+          out[ToStd(key)] = ToStd(dict[key]);
+        }
+      }
+      return out;
+    });
+  }
   try {
     const std::string json = _runner->run_json([progress](const mb::Progress &p) {
       if (progress) {
         progress(p.step, p.total_steps, p.test_index, p.test_count, ToNS(p.test_name), p.warmup);
       }
     });
+    _runner->set_condition_probe(nullptr);
     return ToNS(json);
   } catch (const std::exception &e) {
+    _runner->set_condition_probe(nullptr);
     return ErrorJson(@(e.what()));
   } catch (...) {
+    _runner->set_condition_probe(nullptr);
     return ErrorJson(@"unknown native error");
   }
 }

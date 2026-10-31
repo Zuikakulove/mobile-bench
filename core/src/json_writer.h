@@ -18,6 +18,8 @@ class JsonWriter {
   void begin_object() { open('{'); }
   void end_object() { close('}'); }
   void begin_array() { open('['); }
+  // 数値などスカラーだけの配列を 1 行で出す (pretty 時のサイズ削減)
+  void begin_inline_array() { open('[', /*inline_items=*/true); }
   void end_array() { close(']'); }
 
   void key(const std::string& k) {
@@ -56,16 +58,21 @@ class JsonWriter {
   }
 
  private:
-  void open(char c) {
+  struct Level {
+    bool empty = true;          // まだ要素がない
+    bool inline_items = false;  // 要素を改行せずに並べる
+  };
+
+  void open(char c, bool inline_items = false) {
     before_value();
     out_ += c;
-    stack_.push_back(true);  // true = まだ要素がない
+    stack_.push_back(Level{true, inline_items || (!stack_.empty() && stack_.back().inline_items)});
   }
 
   void close(char c) {
-    const bool empty = stack_.back();
+    const Level level = stack_.back();
     stack_.pop_back();
-    if (!empty) newline_indent();
+    if (!level.empty && !level.inline_items) newline_indent();
     out_ += c;
   }
 
@@ -79,8 +86,14 @@ class JsonWriter {
 
   void comma_and_indent() {
     if (stack_.empty()) return;
-    if (!stack_.back()) out_ += ',';
-    stack_.back() = false;
+    Level& level = stack_.back();
+    if (!level.empty) out_ += ',';
+    const bool first = level.empty;
+    level.empty = false;
+    if (level.inline_items) {
+      if (pretty_ && !first) out_ += ' ';
+      return;
+    }
     newline_indent();
   }
 
@@ -114,7 +127,7 @@ class JsonWriter {
 
   bool pretty_;
   bool after_key_ = false;
-  std::vector<bool> stack_;
+  std::vector<Level> stack_;
   std::string out_;
 };
 

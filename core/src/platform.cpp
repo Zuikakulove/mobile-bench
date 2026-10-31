@@ -153,22 +153,31 @@ std::string sysctl_string(const char* name) {
 
 }  // namespace
 
-std::vector<std::int64_t> read_cpu_cur_khz(int cpu_count) {
+namespace {
+
+std::vector<std::int64_t> read_cpufreq_files(int cpu_count, const char* name) {
   std::vector<std::int64_t> khz;
 #if defined(__linux__) || defined(__ANDROID__)
   bool any = false;
   khz.reserve(static_cast<size_t>(cpu_count));
   for (int cpu = 0; cpu < cpu_count; ++cpu) {
-    const std::int64_t v = read_int_file(cpu_dir(cpu) + "/cpufreq/scaling_cur_freq");
+    const std::int64_t v = read_int_file(cpu_dir(cpu) + "/cpufreq/" + name);
     any = any || v > 0;
     khz.push_back(v);
   }
   if (!any) khz.clear();
 #else
   (void)cpu_count;
+  (void)name;
 #endif
   return khz;
 }
+
+}  // namespace
+
+std::vector<std::int64_t> read_cpu_cur_khz(int cpu_count) { return read_cpufreq_files(cpu_count, "scaling_cur_freq"); }
+
+std::vector<std::int64_t> read_cpu_cap_khz(int cpu_count) { return read_cpufreq_files(cpu_count, "scaling_max_freq"); }
 
 CpuTopology read_cpu_topology(int cpu_count) {
   CpuTopology t;

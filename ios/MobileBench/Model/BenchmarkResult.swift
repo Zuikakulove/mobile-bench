@@ -1,6 +1,6 @@
 import Foundation
 
-/// core が返す JSON (schema_version 2) の表示用モデル。
+/// core が返す JSON (schema_version 3) の表示用モデル。
 /// スコア計算などは一切行わず、JSON の値をそのまま読むだけ。
 struct BenchmarkResult: Decodable {
     struct Config: Decodable {
@@ -91,6 +91,7 @@ struct BenchmarkResult: Decodable {
     let tests: [TestEntry]
     let cpuTopology: Topology?
     let diagnostics: Diagnostics?
+    let summaryText: String?
 
     private struct ErrorOnly: Decodable { let error: String? }
 

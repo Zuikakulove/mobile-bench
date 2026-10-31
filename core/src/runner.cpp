@@ -41,6 +41,15 @@ CpuTopology current_cpu_topology() { return platform::read_cpu_topology(platform
 
 Runner::Runner(RunConfig config) : config_(std::move(config)) {}
 
+Conditions Runner::probe_conditions() {
+  if (!condition_probe_) return {};
+  try {
+    return condition_probe_();
+  } catch (...) {
+    return {{"error", "condition probe failed"}};
+  }
+}
+
 SuiteResult Runner::run(const ProgressCallback& progress) {
   return run_impl(create_default_suite(config_), progress, kWarmupRuns, kMeasuredRuns, config_.diagnostics);
 }
@@ -102,6 +111,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
       test.setup(ctx);
       r.threads = test.threads_used();
       r.expected_checksum = test.expected_checksum();  // setup 後に確定する
+      r.conditions_before = probe_conditions();
       int run = 0;
       for (; run < runs_per_test; ++run) {
         if (cancelled_.load()) break;
@@ -111,6 +121,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
         RunDetail detail;
         detail.warmup = run < warmup_runs;
         test.before_run();  // クロック推定 (計測区間外)
+        detail.cpu_cap_khz = platform::read_cpu_cap_khz(suite.logical_cores);
         detail.cpu_khz_before = platform::read_cpu_cur_khz(suite.logical_cores);
 
         const std::int64_t start = now_ns();
@@ -134,6 +145,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
         ++p.step;
       }
       completed = run == runs_per_test;
+      r.conditions_after = probe_conditions();
       test.teardown();
     } catch (const std::exception& e) {
       r.error = e.what();
@@ -158,6 +170,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
   if (diagnostics && !cancelled_.load()) {
     p.test_index = p.test_count;
     p.test_id = "diagnostics";
+    suite.diagnostics.conditions_before = probe_conditions();
     try {
       suite.diagnostics.matmul_sweep =
           detail::run_matmul_sweep(ctx.threads, cancelled_, [&](const std::string& label, bool warmup) {
@@ -169,6 +182,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
     } catch (...) {
       // 診断の失敗はスコアに影響させない
     }
+    suite.diagnostics.conditions_after = probe_conditions();
   }
   suite.diagnostics.freq = sampler.stop();
 
@@ -181,6 +195,7 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
   }
   suite.valid = all_valid && !suite.cancelled;
   suite.overall_score = suite.valid ? geometric_mean(scores) : 0.0;
+  suite.summary_text = make_summary_text(suite);
 
   p.step = p.total_steps;
   p.warmup = false;

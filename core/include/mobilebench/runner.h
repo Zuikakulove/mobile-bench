@@ -29,6 +29,9 @@ struct Progress {
 
 using ProgressCallback = std::function<void(const Progress&)>;
 
+// 端末の状態を返すコールバック (各テストの開始・終了時に run() を呼んだスレッドで呼ばれる)
+using ConditionProbe = std::function<Conditions()>;
+
 struct RunConfig {
   int threads = 0;  // 0 = 論理コア数を自動検出
   std::string scratch_dir;
@@ -56,11 +59,17 @@ class Runner {
   // 別スレッドから呼んでよい。現在の 1 回の計測が終わった時点で中断する。
   void cancel() { cancelled_.store(true); }
 
+  // run() の前に設定する。nullptr なら状態は記録しない
+  void set_condition_probe(ConditionProbe probe) { condition_probe_ = std::move(probe); }
+
  private:
   SuiteResult run_impl(std::vector<TestPtr> tests, const ProgressCallback& progress, int warmup_runs,
                        int measured_runs, bool diagnostics);
 
+  Conditions probe_conditions();
+
   RunConfig config_;
+  ConditionProbe condition_probe_;
   std::atomic<bool> cancelled_{false};
 };
 

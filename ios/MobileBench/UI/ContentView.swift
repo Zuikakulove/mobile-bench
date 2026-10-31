@@ -80,6 +80,10 @@ private struct ResultSection: View {
         .padding()
         .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
 
+        if let summary = result.summaryText, !summary.isEmpty {
+            Button("要約をコピー (チャットに貼る用)") { UIPasteboard.general.string = summary }
+                .buttonStyle(.borderedProminent)
+        }
         HStack(spacing: 8) {
             Button("JSON をコピー") { UIPasteboard.general.string = rawJson }
                 .buttonStyle(.bordered)

@@ -5,6 +5,14 @@ fun interface ProgressListener {
     fun onProgress(step: Int, totalSteps: Int, testIndex: Int, testCount: Int, testName: String, warmup: Boolean)
 }
 
+/**
+ * 端末の状態 (発熱状態・省電力・電池温度など) を返す。各テストの開始・終了時に計測スレッドから呼ばれる。
+ * 戻り値は [key0, value0, key1, value1, ...] の形。
+ */
+fun interface ConditionProvider {
+    fun conditions(): Array<String>
+}
+
 /** JNI の宣言 (実装は src/main/cpp/jni_bridge.cpp)。 */
 object NativeLib {
     init {
@@ -17,7 +25,7 @@ object NativeLib {
         scratchDir: String,
         diagnostics: Boolean,
     ): Long
-    external fun nativeRun(handle: Long, listener: ProgressListener?): ByteArray
+    external fun nativeRun(handle: Long, listener: ProgressListener?, conditionProvider: ConditionProvider?): ByteArray
     external fun nativeCancel(handle: Long)
     external fun nativeDestroy(handle: Long)
 }
@@ -37,10 +45,10 @@ class NativeBench(device: Map<String, String>, scratchDir: String, diagnostics: 
     )
 
     /** 計測を実行し、core が生成した JSON を返す。 */
-    fun run(listener: ProgressListener?): String {
+    fun run(listener: ProgressListener?, conditionProvider: ConditionProvider? = null): String {
         val h = synchronized(lock) { handle }
         check(h != 0L) { "already closed" }
-        return NativeLib.nativeRun(h, listener).toString(Charsets.UTF_8)
+        return NativeLib.nativeRun(h, listener, conditionProvider).toString(Charsets.UTF_8)
     }
 
     fun cancel() {

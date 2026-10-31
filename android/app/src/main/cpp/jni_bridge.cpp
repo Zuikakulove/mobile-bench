@@ -57,9 +57,38 @@ extern "C" JNIEXPORT jlong JNICALL Java_com_mobilebench_app_bench_NativeLib_nati
 
 // 呼び出し元 (Kotlin のバックグラウンドスレッド) でブロックし、結果 JSON を UTF-8 で返す。
 extern "C" JNIEXPORT jbyteArray JNICALL Java_com_mobilebench_app_bench_NativeLib_nativeRun(
-    JNIEnv* env, jobject /*thiz*/, jlong handle, jobject listener) {
+    JNIEnv* env, jobject /*thiz*/, jlong handle, jobject listener, jobject condition_provider) {
   mb::Runner* runner = from_handle(handle);
   if (runner == nullptr) return to_byte_array(env, error_json("invalid handle"));
+
+  // 端末の状態 (発熱状態など) は Kotlin 側が Android の公式 API で取得する。
+  // 各テストの開始・終了時に、run() を呼んだのと同じスレッドで呼ばれる
+  if (condition_provider != nullptr) {
+    jclass cls = env->GetObjectClass(condition_provider);
+    jmethodID get_conditions = env->GetMethodID(cls, "conditions", "()[Ljava/lang/String;");
+    env->DeleteLocalRef(cls);
+    runner->set_condition_probe([env, condition_provider, get_conditions]() {
+      mb::Conditions out;
+      auto arr = static_cast<jobjectArray>(env->CallObjectMethod(condition_provider, get_conditions));
+      if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+        out["error"] = "condition provider threw";
+        return out;
+      }
+      if (arr == nullptr) return out;
+      const jsize n = env->GetArrayLength(arr);
+      for (jsize i = 0; i + 1 < n; i += 2) {  // [key0, value0, key1, value1, ...]
+        auto k = static_cast<jstring>(env->GetObjectArrayElement(arr, i));
+        auto v = static_cast<jstring>(env->GetObjectArrayElement(arr, i + 1));
+        out[to_std_string(env, k)] = to_std_string(env, v);
+        env->DeleteLocalRef(k);
+        env->DeleteLocalRef(v);
+      }
+      env->DeleteLocalRef(arr);
+      return out;
+    });
+  }
 
   jmethodID on_progress = nullptr;
   if (listener != nullptr) {
@@ -90,6 +119,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_mobilebench_app_bench_NativeLib
   } catch (...) {
     json = error_json("unknown native error");
   }
+  runner->set_condition_probe(nullptr);  // env と provider はこの呼び出しの間だけ有効
   return to_byte_array(env, json);
 }
 

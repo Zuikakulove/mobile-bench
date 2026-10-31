@@ -1,17 +1,24 @@
 package com.mobilebench.app
 
 import android.app.Application
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
+import android.os.PowerManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mobilebench.app.bench.BenchmarkResult
+import com.mobilebench.app.bench.ConditionProvider
 import com.mobilebench.app.bench.NativeBench
+import com.mobilebench.app.bench.ProgressListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 
 sealed interface UiState {
     data object Idle : UiState
@@ -56,7 +63,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
                     ).use { bench ->
                         current = bench
                         try {
-                            bench.run { step, total, testIndex, testCount, testName, warmup ->
+                            val listener = ProgressListener { step, total, testIndex, testCount, testName, warmup ->
                                 // StateFlow はスレッドセーフなのでバックグラウンドから直接更新してよい
                                 _state.value = UiState.Running(
                                     fraction = if (total > 0) step.toFloat() / total else 0f,
@@ -66,6 +73,7 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
                                     warmup = warmup,
                                 )
                             }
+                            bench.run(listener, ConditionProvider { currentConditions() })
                         } finally {
                             current = null
                         }
@@ -89,6 +97,52 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         cancel()
         super.onCleared()
+    }
+
+    /**
+     * 端末の状態を Android の公式 API で取得する (各テストの開始・終了時に計測スレッドから呼ばれる)。
+     * - thermal_status: PowerManager の発熱状態 (NONE が通常)
+     * - thermal_headroom_10s: 10 秒後に発熱制限に達するまでの余裕 (1.0 で制限開始。短い間隔で呼ぶと NaN)
+     * - power_save: 省電力モード
+     * - battery_temp_c / battery_level / charging: 電池の状態
+     */
+    private fun currentConditions(): Array<String> {
+        val app = getApplication<Application>()
+        val out = mutableListOf<String>()
+        fun put(key: String, value: Any?) {
+            out += key
+            out += value.toString()
+        }
+        val pm = app.getSystemService(PowerManager::class.java)
+        if (pm != null) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) put("thermal_status", thermalName(pm.currentThermalStatus))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val headroom = pm.getThermalHeadroom(10)
+                put("thermal_headroom_10s", if (headroom.isNaN()) "NaN" else String.format(Locale.ROOT, "%.2f", headroom))
+            }
+            put("power_save", pm.isPowerSaveMode)
+        }
+        // ACTION_BATTERY_CHANGED は sticky なので receiver なしで最新値を取得できる
+        runCatching { app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED)) }.getOrNull()?.let { battery ->
+            val temp = battery.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, Int.MIN_VALUE)
+            if (temp != Int.MIN_VALUE) put("battery_temp_c", String.format(Locale.ROOT, "%.1f", temp / 10.0))
+            val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (level >= 0 && scale > 0) put("battery_level", level * 100 / scale)
+            put("charging", battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0)
+        }
+        return out.toTypedArray()
+    }
+
+    private fun thermalName(status: Int): String = when (status) {
+        PowerManager.THERMAL_STATUS_NONE -> "NONE"
+        PowerManager.THERMAL_STATUS_LIGHT -> "LIGHT"
+        PowerManager.THERMAL_STATUS_MODERATE -> "MODERATE"
+        PowerManager.THERMAL_STATUS_SEVERE -> "SEVERE"
+        PowerManager.THERMAL_STATUS_CRITICAL -> "CRITICAL"
+        PowerManager.THERMAL_STATUS_EMERGENCY -> "EMERGENCY"
+        PowerManager.THERMAL_STATUS_SHUTDOWN -> "SHUTDOWN"
+        else -> "UNKNOWN($status)"
     }
 
     private fun deviceInfo(): Map<String, String> = buildMap {

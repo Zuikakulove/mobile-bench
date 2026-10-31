@@ -28,11 +28,15 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
       - name: Install SDK packages
+        # ubuntu ランナーには Android SDK がプリインストールされているので、その sdkmanager を使う。
         # app/build.gradle.kts の ndkVersion / cmake version / compileSdk と揃えること
-        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          SDKMANAGER="$(ls -d "${ANDROID_HOME}"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)"
+          echo "Using ${SDKMANAGER}"
+          yes | "${SDKMANAGER}" --licenses > /dev/null || true
+          "${SDKMANAGER}" --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
 
       - uses: gradle/actions/setup-gradle@v4
 

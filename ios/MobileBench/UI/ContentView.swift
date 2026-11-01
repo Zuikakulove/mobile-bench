@@ -21,7 +21,7 @@ struct ContentView: View {
                                 .buttonStyle(.bordered)
                         }
                     }
-                    Toggle("診断モード (行列サイズ掃引・クロック記録。スコアには影響しません。+数秒)", isOn: $viewModel.diagnostics)
+                    Toggle("診断モード (ブースト推移・コア種類別・行列サイズ掃引。スコアには影響しません。+30秒程度)", isOn: $viewModel.diagnostics)
                         .font(.subheadline)
                         .disabled(viewModel.isRunning)
 

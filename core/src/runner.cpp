@@ -84,7 +84,8 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
   const int runs_per_test = warmup_runs + measured_runs;
   Progress p;
   p.test_count = static_cast<int>(tests.size());
-  p.total_steps = p.test_count * runs_per_test + (diagnostics ? detail::matmul_sweep_steps() : 0);
+  const auto clusters = detail::cpu_clusters(suite.topology, suite.logical_cores);
+  p.total_steps = p.test_count * runs_per_test + (diagnostics ? detail::diagnostics_steps(clusters.size()) : 0);
 
   auto report = [&] {
     if (progress) progress(p);
@@ -172,13 +173,14 @@ SuiteResult Runner::run_impl(std::vector<TestPtr> tests, const ProgressCallback&
     p.test_id = "diagnostics";
     suite.diagnostics.conditions_before = probe_conditions();
     try {
-      suite.diagnostics.matmul_sweep =
-          detail::run_matmul_sweep(ctx.threads, cancelled_, [&](const std::string& label, bool warmup) {
-            p.test_name = label;
-            p.warmup = warmup;
-            report();
-            ++p.step;
-          });
+      detail::run_diagnostics(ctx.threads, suite.topology, clusters, cancelled_,
+                              [&](const std::string& label, bool warmup) {
+                                p.test_name = label;
+                                p.warmup = warmup;
+                                report();
+                                ++p.step;
+                              },
+                              suite.diagnostics);
     } catch (...) {
       // 診断の失敗はスコアに影響させない
     }

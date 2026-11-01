@@ -2,6 +2,7 @@
 // 途中で切れるため、切り分けに必要な情報を 1 回 1 行に詰めた 4〜5KB のテキストを作る。
 // 小数はロケール非依存の JsonWriter::format_fixed で整形する。
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -142,13 +143,56 @@ std::string make_summary_text(const SuiteResult& r) {
   if (r.diagnostics_enabled) {
     const auto& d = r.diagnostics;
     line("[diagnostics] cond " + conditions(d.conditions_before) + " -> " + conditions(d.conditions_after));
-    line("  n    ws1T     wsMT     1T_GF   MT_GF   MT/1T  worker_units");
+    // ブースト: 250ms ごとの区間に分け、区間内の中央値 (外れ値に強い) を出す
+    for (const auto& b : d.boost) {
+      std::string segs;
+      constexpr std::int64_t kBucketMs = 250;
+      size_t i = 0;
+      while (i < b.samples.size()) {
+        const std::int64_t bucket = b.samples[i].t_ms / kBucketMs;
+        std::vector<double> ghz, unit;
+        std::vector<int> cpus;
+        size_t j = i;
+        for (; j < b.samples.size() && b.samples[j].t_ms / kBucketMs == bucket; ++j) {
+          ghz.push_back(b.samples[j].ghz);
+          unit.push_back(b.samples[j].unit_ms);
+          cpus.push_back(b.samples[j].cpu);
+        }
+        auto med = [](std::vector<double> v) {
+          std::sort(v.begin(), v.end());
+          return v[v.size() / 2];
+        };
+        if (!segs.empty()) segs += " | ";
+        segs += std::to_string(bucket * kBucketMs) + ":" + fixed(med(ghz), 2) + "G u" + fixed(med(unit), 1) + " cpu" +
+                cpu_ranges(cpus);
+        i = j;
+      }
+      line("  boost idle " + std::to_string(b.idle_ms) + "ms (t_ms:GHz unit_ms cpu) " + (segs.empty() ? "-" : segs));
+    }
+    line("  cluster: kernel threads ms/unit @GHz(load) = Mcycles/unit | matmul128: GF, flops/cycle/thread");
+    for (const auto& c : d.clusters) {
+      std::string head = "  cpu" + cpu_ranges(c.cpus) + " max" +
+                         (c.max_khz > 0 ? std::to_string(c.max_khz / 1000) : std::string("?")) + " cap" +
+                         (c.capacity > 0 ? std::to_string(c.capacity) : std::string("?")) + ":";
+      line(head);
+      for (const auto& m : c.measures) {
+        std::string l = "    " + m.kernel + " " + std::to_string(m.threads) + "T" + (m.pinned ? "" : "(unpinned)") +
+                        " " + fixed(m.ms_per_unit, 2) + "ms @" + fixed(m.ghz_load, 2) + "G = " +
+                        fixed(m.mcycles_per_unit, 1) + "Mc";
+        if (m.gflops > 0) l += " | " + fixed(m.gflops, 2) + "GF " + fixed(m.flops_per_cycle, 2) + "f/c";
+        l += " cpu" + cpu_ranges(m.cpus);
+        if (!m.error.empty()) l += " error=" + m.error;
+        line(l);
+      }
+    }
+    line("  n    ws1T     wsMT     1T_GF@GHz(cpu)   MT_GF@GHz   MT/1T  worker_units");
     for (const auto& p : d.matmul_sweep) {
       auto kb = [](std::int64_t b) { return std::to_string(b / 1024) + "K"; };
       std::string units;
       for (const auto& w : p.mt_workers) units += (units.empty() ? "" : ",") + std::to_string(w.units);
       line("  " + std::to_string(p.n) + " " + kb(p.st_working_set_bytes) + " " + kb(p.mt_working_set_bytes) + " " +
-           fixed(p.st_gflops, 2) + " " + fixed(p.mt_gflops, 2) + " " +
+           fixed(p.st_gflops, 2) + "@" + fixed(p.st_ghz_load, 2) + "(cpu" + cpu_ranges(p.st_cpus) + ") " +
+           fixed(p.mt_gflops, 2) + "@" + fixed(p.mt_ghz_load, 2) + " " +
            fixed(p.st_gflops > 0 ? p.mt_gflops / p.st_gflops : 0, 2) + "x" + (p.valid ? "" : " INVALID") + " [" +
            units + "]");
     }

@@ -14,7 +14,7 @@
     <string name="show_json">結果 JSON を表示</string>
     <string name="hide_json">結果 JSON を隠す</string>
     <string name="build_label">アプリ %1$s (build %2$d · %3$s)</string>
-    <string name="diagnostics_label">診断モード (行列サイズ掃引・クロック記録。スコアには影響しません。+数秒)</string>
+    <string name="diagnostics_label">診断モード (ブースト推移・コア種類別・行列サイズ掃引。スコアには影響しません。+30秒程度)</string>
     <string name="show_runs">各回の内訳を表示</string>
     <string name="hide_runs">各回の内訳を隠す</string>
     <string name="sweep_title">診断: 行列サイズとキャッシュ</string>

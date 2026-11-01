@@ -14,6 +14,12 @@ void write_int_array(JsonWriter& w, const std::vector<T>& values) {
   w.end_array();
 }
 
+void write_fixed_array(JsonWriter& w, const std::vector<double>& values, int decimals) {
+  w.begin_inline_array();
+  for (double v : values) w.value_fixed(v, decimals);
+  w.end_array();
+}
+
 void write_workers(JsonWriter& w, const std::vector<WorkerTelemetry>& workers) {
   w.begin_array();
   for (const auto& wk : workers) {
@@ -24,6 +30,10 @@ void write_workers(JsonWriter& w, const std::vector<WorkerTelemetry>& workers) {
     w.key("cpus"); write_int_array(w, wk.cpus);
     w.key("ghz_before"); w.value_fixed(wk.ghz_before, 3);
     w.key("ghz_after"); w.value_fixed(wk.ghz_after, 3);
+    if (wk.ghz_load_avg > 0) {
+      w.key("ghz_load_avg"); w.value_fixed(wk.ghz_load_avg, 3);
+      w.key("ghz_load_max"); w.value_fixed(wk.ghz_load_max, 3);
+    }
     w.end_object();
   }
   w.end_array();
@@ -87,6 +97,57 @@ void write_topology(JsonWriter& w, const CpuTopology& t) {
 
 void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
   w.begin_object();
+  w.key("boost");
+  w.begin_array();
+  for (const auto& b : d.boost) {
+    std::vector<std::int64_t> t_ms;
+    std::vector<int> cpus;
+    std::vector<double> unit_ms, ghz;
+    for (const auto& s : b.samples) {
+      t_ms.push_back(s.t_ms);
+      cpus.push_back(s.cpu);
+      unit_ms.push_back(s.unit_ms);
+      ghz.push_back(s.ghz);
+    }
+    w.begin_object();
+    w.key("idle_ms"); w.value(b.idle_ms);
+    w.key("t_ms"); write_int_array(w, t_ms);
+    w.key("unit_ms"); write_fixed_array(w, unit_ms, 2);
+    w.key("cpu"); write_int_array(w, cpus);
+    w.key("ghz"); write_fixed_array(w, ghz, 2);
+    w.end_object();
+  }
+  w.end_array();
+  w.key("clusters");
+  w.begin_array();
+  for (const auto& c : d.clusters) {
+    w.begin_object();
+    w.key("cpus"); write_int_array(w, c.cpus);
+    w.key("max_khz"); w.value(c.max_khz);
+    w.key("capacity"); w.value(c.capacity);
+    w.key("measures");
+    w.begin_array();
+    for (const auto& m : c.measures) {
+      w.begin_object();
+      w.key("kernel"); w.value(m.kernel);
+      w.key("threads"); w.value(m.threads);
+      w.key("pinned"); w.value(m.pinned);
+      w.key("units_per_thread"); w.value(m.units_per_thread);
+      w.key("ms_per_unit"); w.value_fixed(m.ms_per_unit, 4);
+      w.key("ghz_load"); w.value_fixed(m.ghz_load, 3);
+      w.key("mcycles_per_unit"); w.value_fixed(m.mcycles_per_unit, 3);
+      w.key("gflops"); w.value_fixed(m.gflops, 3);
+      w.key("flops_per_cycle"); w.value_fixed(m.flops_per_cycle, 3);
+      w.key("cpus"); write_int_array(w, m.cpus);
+      if (!m.error.empty()) {
+        w.key("error"); w.value(m.error);
+      }
+      w.end_object();
+    }
+    w.end_array();
+    w.end_object();
+  }
+  w.end_array();
   w.key("matmul_sweep");
   w.begin_array();
   for (const auto& p : d.matmul_sweep) {
@@ -104,6 +165,9 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
     w.key("st_gflops"); w.value_fixed(p.st_gflops, 3);
     w.key("mt_gflops"); w.value_fixed(p.mt_gflops, 3);
     w.key("valid"); w.value(p.valid);
+    w.key("st_ghz_load"); w.value_fixed(p.st_ghz_load, 3);
+    w.key("mt_ghz_load"); w.value_fixed(p.mt_ghz_load, 3);
+    w.key("st_cpus"); write_int_array(w, p.st_cpus);
     w.key("mt_workers"); write_workers(w, p.mt_workers);
     w.end_object();
   }
@@ -127,7 +191,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // JSON スキーマ (schema_version を変えたら UI 側のパーサも更新すること)
 //
 // {
-//   "schema_version": 3,
+//   "schema_version": 4,
 //   "benchmark_version": "0.1.0",
 //   "score_formula": "reference_ns / median_ns * 1000",
 //   "overall_score": 1234.567,          // 各テストスコアの幾何平均
@@ -148,10 +212,11 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // schema 2 (benchmark 0.1.1): run_details / cpu_topology / diagnostics を追加
 // schema 3 (benchmark 0.1.1): cpu_cap_khz / conditions_before,after / summary_text を追加。
 //                             数値配列を 1 行で出力 (計測区間は変更なし)
+// schema 4 (benchmark 0.1.1): diagnostics に boost / clusters、負荷中クロック (ghz_load_*) を追加
 std::string to_json(const SuiteResult& r, bool pretty) {
   detail::JsonWriter w(pretty);
   w.begin_object();
-  w.key("schema_version"); w.value(3);
+  w.key("schema_version"); w.value(4);
   w.key("benchmark_version"); w.value(r.benchmark_version);
   w.key("score_formula"); w.value("reference_ns / median_ns * 1000");
   w.key("overall_score"); w.value_fixed(r.overall_score, 3);

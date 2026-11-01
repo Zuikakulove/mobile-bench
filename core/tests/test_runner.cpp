@@ -237,7 +237,7 @@ TEST(runner_records_run_details_including_warmup) {
     EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
   }
   const std::string json = to_json(r, false);
-  EXPECT_TRUE(json.find("\"schema_version\":3") != std::string::npos);
+  EXPECT_TRUE(json.find("\"schema_version\":4") != std::string::npos);
   EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
   EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);
   EXPECT_TRUE(json.find("\"diagnostics\":{") == std::string::npos);  // 診断モードでなければ出さない
@@ -275,4 +275,70 @@ TEST(pretty_json_keeps_number_arrays_on_one_line) {
   r.tests.push_back(t);
   const std::string json = to_json(r, true);
   EXPECT_TRUE(json.find("\"runs_ns\": [1, 2, 3]") != std::string::npos);
+}
+
+// ---- 診断 (クラスタ / ブースト / 負荷中クロック) -----------------------------------
+
+#include "diagnostics.h"
+
+TEST(cpu_clusters_group_by_capacity_and_max_freq) {
+  CpuTopology t;
+  t.max_khz = {3532800, 3532800, 3532800, 3532800, 3532800, 3532800, 4320000, 4320000};
+  t.capacity = {792, 792, 792, 792, 792, 792, 1024, 1024};
+  auto c = detail::cpu_clusters(t, 8);
+  EXPECT_EQ(c.size(), 2u);
+  EXPECT_TRUE(c[0] == (std::vector<int>{6, 7}));  // 速いクラスタが先
+  EXPECT_TRUE(c[1] == (std::vector<int>{0, 1, 2, 3, 4, 5}));
+  CpuTopology none;
+  EXPECT_TRUE(detail::cpu_clusters(none, 8).empty());  // 情報がなければ固定しない
+}
+
+TEST(cluster_measure_reports_per_clock_metrics) {
+#if defined(__linux__)
+  const std::vector<std::vector<int>> masks{{0}};  // cpu0 に固定
+#else
+  const std::vector<std::vector<int>> masks{{}};
+#endif
+  ClusterMeasure m = detail::run_cluster_measure("matmul128", masks, 20);
+  EXPECT_TRUE(m.error.empty());
+  EXPECT_EQ(m.threads, 1);
+  EXPECT_TRUE(m.ms_per_unit > 0);
+  EXPECT_TRUE(m.gflops > 0);
+#if defined(__linux__)
+  EXPECT_TRUE(m.pinned);
+  EXPECT_TRUE(m.cpus == (std::vector<int>{0}));
+#endif
+#if defined(__x86_64__) || defined(__aarch64__)
+  EXPECT_TRUE(m.ghz_load > 0.3 && m.ghz_load < 7.0);
+  EXPECT_NEAR(m.mcycles_per_unit, m.ms_per_unit * m.ghz_load, 1e-9);
+  EXPECT_TRUE(m.flops_per_cycle > 0);
+#endif
+  ClusterMeasure s = detail::run_cluster_measure("sieve", {{}, {}}, 2);
+  EXPECT_TRUE(s.error.empty());
+  EXPECT_EQ(s.threads, 2);
+  EXPECT_EQ(s.gflops, 0.0);
+}
+
+TEST(boost_trace_records_samples) {
+  std::atomic<bool> cancelled{false};
+  BoostTrace b = detail::run_boost_trace(0, 150, cancelled);
+  EXPECT_TRUE(!b.samples.empty());
+  for (size_t i = 1; i < b.samples.size(); ++i) EXPECT_TRUE(b.samples[i].t_ms >= b.samples[i - 1].t_ms);
+  EXPECT_TRUE(b.samples[0].unit_ms > 0);
+}
+
+TEST(inload_probe_records_load_clock) {
+  detail::UnitBasedTest t({"t", "t", "cpu", 1}, std::make_unique<detail::SieveKernel>(2'000'000, 148'933), 6, true);
+  t.enable_inload_probe(true);
+  TestContext ctx;
+  ctx.threads = 2;
+  t.setup(ctx);
+  EXPECT_EQ(t.run_once(), t.expected_checksum());
+  RunTelemetry tel = t.take_telemetry();
+#if defined(__x86_64__) || defined(__aarch64__)
+  for (const auto& w : tel.workers) {
+    if (w.units > 0) EXPECT_TRUE(w.ghz_load_avg > 0 && w.ghz_load_max >= w.ghz_load_avg);
+  }
+#endif
+  t.teardown();
 }

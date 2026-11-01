@@ -20,6 +20,8 @@ struct WorkerTelemetry {
   std::vector<int> cpus;       // 作業単位の開始時に観測した CPU 番号 (昇順・重複なし)。取得不可なら空
   double ghz_before = 0.0;     // 計測直前の実効クロック推定値 [GHz] (0 = 未計測)
   double ghz_after = 0.0;      // 計測直後の実効クロック推定値 [GHz]
+  double ghz_load_avg = 0.0;   // 負荷中 (作業単位の合間) の実効クロック平均 [GHz]。診断時のみ、0 = 未計測
+  double ghz_load_max = 0.0;
 };
 
 struct RunTelemetry {
@@ -76,6 +78,45 @@ struct MatmulSweepPoint {
   double mt_gflops = 0.0;
   bool valid = false;
   std::vector<WorkerTelemetry> mt_workers;  // MT の最後の回のワーカー内訳
+  double st_ghz_load = 0.0;   // 負荷中の実効クロック (ST)
+  double mt_ghz_load = 0.0;   // 負荷中の実効クロック (MT、ワーカー平均)
+  std::vector<int> st_cpus;   // ST が動いた CPU
+};
+
+// コアの種類ごとの性能 (診断)。Android / Linux ではスレッドをそのクラスタのコアに固定して測る。
+// 1 クロックあたりの性能 (Mcycles/unit, flops/cycle) で比べると、クロック状態の違いに左右されない。
+struct ClusterMeasure {
+  std::string kernel;          // "sieve" / "matmul128"
+  int threads = 0;
+  bool pinned = false;         // コアに固定できたか
+  int units_per_thread = 0;
+  double ms_per_unit = 0.0;    // スレッド平均
+  double ghz_load = 0.0;       // 負荷中の実効クロック (スレッド平均)
+  double mcycles_per_unit = 0.0;  // ms_per_unit x ghz_load (= 1 単位あたりの百万サイクル)
+  double gflops = 0.0;         // matmul のみ: 全スレッド合計
+  double flops_per_cycle = 0.0;   // matmul のみ: 1 スレッドあたり
+  std::vector<int> cpus;       // 実際に動いた CPU
+  std::string error;
+};
+
+struct ClusterResult {
+  std::vector<int> cpus;
+  std::int64_t max_khz = -1;
+  int capacity = -1;
+  std::vector<ClusterMeasure> measures;
+};
+
+// ブーストの持続 (診断): 休止の後、1 コアに連続で負荷をかけたときの実効クロックの推移
+struct BoostSample {
+  std::int64_t t_ms = 0;     // 負荷開始からの経過
+  double unit_ms = 0.0;      // 篩 1 単位の時間
+  int cpu = -1;
+  double ghz = 0.0;          // 単位の直後の実効クロック
+};
+
+struct BoostTrace {
+  int idle_ms = 0;
+  std::vector<BoostSample> samples;
 };
 
 struct FreqSamples {
@@ -88,6 +129,8 @@ struct FreqSamples {
 using Conditions = std::map<std::string, std::string>;
 
 struct Diagnostics {
+  std::vector<BoostTrace> boost;
+  std::vector<ClusterResult> clusters;
   std::vector<MatmulSweepPoint> matmul_sweep;
   FreqSamples freq;
   Conditions conditions_before;

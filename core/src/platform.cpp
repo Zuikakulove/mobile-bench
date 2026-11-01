@@ -91,6 +91,21 @@ int current_cpu() {
 #endif
 }
 
+bool pin_current_thread(const std::vector<int>& cpus) {
+#if defined(__linux__) || defined(__ANDROID__)
+  if (cpus.empty()) return false;
+  cpu_set_t set;
+  CPU_ZERO(&set);
+  for (int c : cpus) {
+    if (c >= 0 && c < CPU_SETSIZE) CPU_SET(c, &set);
+  }
+  return sched_setaffinity(0, sizeof(set), &set) == 0;
+#else
+  (void)cpus;
+  return false;
+#endif
+}
+
 namespace {
 
 #if defined(__linux__) || defined(__ANDROID__)

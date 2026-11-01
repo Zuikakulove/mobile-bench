@@ -10,4 +10,7 @@ namespace mb::detail {
 
 double estimate_clock_ghz();
 
+// 負荷中に挟む短い版 (2 万加算 x 3 回の最大値、4GHz で計約 15µs)
+double quick_clock_ghz();
+
 }  // namespace mb::detail

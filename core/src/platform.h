@@ -25,6 +25,10 @@ void configure_benchmark_thread();
 // 呼び出しスレッドが現在動いている CPU 番号。取得できない OS (iOS) では -1
 int current_cpu();
 
+// 呼び出しスレッドを指定 CPU 群に固定する (診断専用。スコア対象のテストでは使わない)。
+// Android / Linux のみ。iOS ではできないので false
+bool pin_current_thread(const std::vector<int>& cpus);
+
 // 各コアの現在周波数 [kHz] (OS 報告値)。Android / Linux の sysfs のみ。
 // 読めないコアは -1。どのコアも読めない (iOS や SELinux で拒否) 場合は空。
 std::vector<std::int64_t> read_cpu_cur_khz(int cpu_count);

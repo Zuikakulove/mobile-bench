@@ -53,4 +53,25 @@ double estimate_clock_ghz() {
 #endif
 }
 
+double quick_clock_ghz() {
+#if defined(__aarch64__) || defined(__arm64__) || defined(__x86_64__)
+  using clock = std::chrono::steady_clock;
+  constexpr std::uint64_t kIterations = 200;  // 2 万加算 x 3 回 (4GHz で計約 15µs)
+  std::uint64_t one = 1;
+  asm volatile("" : "+r"(one));
+  double best = 0.0;
+  for (int rep = 0; rep < 3; ++rep) {  // 割り込みで低く出た回を除くため最大値を採る
+    const auto t0 = clock::now();
+    volatile std::uint64_t sink = add_chain(kIterations, one);
+    (void)sink;
+    const auto t1 = clock::now();
+    const double ns = static_cast<double>(std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
+    if (ns > 0) best = std::max(best, static_cast<double>(kIterations) * kAddsPerIteration / ns);
+  }
+  return best;
+#else
+  return 0.0;
+#endif
+}
+
 }  // namespace mb::detail

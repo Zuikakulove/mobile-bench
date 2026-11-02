@@ -124,16 +124,29 @@ std::string make_summary_text(const SuiteResult& r) {
   line("device: " + get(r.device, "manufacturer") + " " + get(r.device, "model") + " soc=" + get(r.device, "soc_model") +
        " " + get(r.device, "platform") + " " + get(r.device, "os_version") + " | " + r.build.arch + " " + compiler + " " +
        r.build.flags + (r.build.optimized ? "" : " NOT-OPTIMIZED"));
-  line("overall " + fixed(r.overall_score, 1) + " valid=" + (r.valid ? "yes" : "no") +
+  std::string scores;
+  for (const auto& ph : r.phases) {
+    scores += ph.name + " " + fixed(ph.score, 1) + (ph.valid ? "" : "(invalid)") + (ph.stable ? "" : "(unstable)") + " ";
+  }
+  line("scores " + scores + "retention " + fixed(r.retention * 100.0, 1) + "% valid=" + (r.valid ? "yes" : "no") +
        (r.cancelled ? " CANCELLED" : "") + " cores=" + std::to_string(r.logical_cores) +
        " diag=" + (r.diagnostics_enabled ? "yes" : "no"));
+  line("baseline " + fixed(r.baseline_ghz, 2) + "GHz(all-core) precondition " + std::to_string(r.precondition.ms) +
+       "ms -> " + fixed(r.precondition.ghz, 2) + "GHz" + (r.precondition.settled ? " settled" : " not-settled"));
   line("topology max_mhz " + mhz_groups(r.topology.max_khz) + " capacity " +
        groups(r.topology.capacity, [](int v) { return std::to_string(v); }));
   line("columns: run time cpu ghz(before>after) cur(after,MHz) cap(MHz) | ST: unit ms | MT: units/worker busy");
 
   for (const auto& t : r.tests) {
-    line("[" + t.id + "] median " + ms(t.median_ns) + "ms score " + fixed(t.score, 1) + " threads " +
-         std::to_string(t.threads) + (t.valid ? "" : " INVALID") + (t.error.empty() ? "" : " error=" + t.error));
+    std::string wait;
+    if (t.wait_ms >= 0) {
+      wait = " wait " + std::to_string(t.wait_ms) + "ms" + (t.recovered ? "" : "(NOT recovered)") + " rec " +
+             fixed(t.recovery_ghz, 2) + "G";
+    }
+    line("[" + t.phase + " " + t.id + "] median " + ms(t.median_ns) + "ms score " + fixed(t.score, 1) + " threads " +
+         std::to_string(t.threads) + " @" + fixed(t.ghz, 2) + "G spread " + fixed(t.spread * 100.0, 1) + "%" +
+         (t.stable ? "" : " UNSTABLE") + " attempts " + std::to_string(t.attempts) + wait +
+         (t.valid ? "" : " INVALID") + (t.error.empty() ? "" : " error=" + t.error));
     if (!t.conditions_before.empty() || !t.conditions_after.empty()) {
       line("  cond " + conditions(t.conditions_before) + " -> " + conditions(t.conditions_after));
     }

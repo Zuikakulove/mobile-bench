@@ -1,6 +1,6 @@
 import Foundation
 
-/// core が返す JSON (schema_version 3) の表示用モデル。
+/// core が返す JSON (schema_version 5) の表示用モデル。
 /// スコア計算などは一切行わず、JSON の値をそのまま読むだけ。
 struct BenchmarkResult: Decodable {
     struct Config: Decodable {
@@ -43,6 +43,7 @@ struct BenchmarkResult: Decodable {
     }
 
     struct TestEntry: Decodable, Identifiable {
+        let phase: String?
         let id: String
         let name: String
         let threads: Int
@@ -52,6 +53,26 @@ struct BenchmarkResult: Decodable {
         let valid: Bool
         let error: String?
         let runDetails: [RunDetail]?
+        let stable: Bool?
+        let spread: Double?
+        let attempts: Int?
+        let ghz: Double?
+        let waitMs: Int?
+        let recovered: Bool?
+        /// peak と sustained で同じ id のテストがあるため、一覧の識別子は段階込みにする
+        var key: String { (phase ?? "") + "/" + id }
+    }
+
+    struct PhaseScore: Decodable {
+        let score: Double
+        let valid: Bool
+        let stable: Bool
+    }
+
+    struct Scores: Decodable {
+        let peak: PhaseScore?
+        let sustained: PhaseScore?
+        let retention: Double
     }
 
     struct PerfLevel: Decodable {
@@ -84,6 +105,7 @@ struct BenchmarkResult: Decodable {
 
     let benchmarkVersion: String
     let overallScore: Double
+    let scores: Scores?
     let valid: Bool
     let cancelled: Bool
     let config: Config

@@ -58,7 +58,8 @@ NSString *ErrorJson(NSString *message) {
   try {
     const std::string json = _runner->run_json([progress](const mb::Progress &p) {
       if (progress) {
-        progress(p.step, p.total_steps, p.test_index, p.test_count, ToNS(p.test_name), p.warmup);
+        progress(p.step, p.total_steps, p.test_index, p.test_count, ToNS(p.test_name), p.warmup, ToNS(p.phase),
+                 p.wait_ms, p.attempt);
       }
     });
     _runner->set_condition_probe(nullptr);

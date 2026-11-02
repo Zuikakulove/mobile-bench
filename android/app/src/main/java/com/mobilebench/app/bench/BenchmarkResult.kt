@@ -4,12 +4,17 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * core が返す JSON (schema_version 3) の表示用モデル。
+ * core が返す JSON (schema_version 5) の表示用モデル。
  * スコア計算などは一切行わず、JSON の値を読んで表示しやすい形にまとめるだけ。
  */
 data class BenchmarkResult(
     val benchmarkVersion: String,
     val overallScore: Double,
+    val peakScore: Double,
+    val sustainedScore: Double,
+    val retention: Double,          // 持続率 (sustained / peak)
+    val peakStable: Boolean,
+    val sustainedStable: Boolean,
     val valid: Boolean,
     val cancelled: Boolean,
     val logicalCores: Int,
@@ -21,6 +26,7 @@ data class BenchmarkResult(
     val summaryText: String,
 ) {
     data class TestEntry(
+        val phase: String,             // "peak" / "sustained"
         val id: String,
         val name: String,
         val threads: Int,
@@ -29,6 +35,12 @@ data class BenchmarkResult(
         val valid: Boolean,
         val error: String?,
         val runs: List<RunEntry>,
+        val stable: Boolean,
+        val spread: Double,
+        val attempts: Int,
+        val ghz: Double,
+        val waitMs: Int,
+        val recovered: Boolean,
     )
 
     /** 1 回の計測の内訳 (ウォームアップ含む)。 */
@@ -68,6 +80,7 @@ data class BenchmarkResult(
             val tests = (0 until testsArr.length()).map { i ->
                 val t = testsArr.getJSONObject(i)
                 TestEntry(
+                    phase = t.optString("phase", "peak"),
                     id = t.getString("id"),
                     name = t.getString("name"),
                     threads = t.getInt("threads"),
@@ -76,12 +89,26 @@ data class BenchmarkResult(
                     valid = t.getBoolean("valid"),
                     error = t.optString("error").takeIf { it.isNotEmpty() },
                     runs = t.optJSONArray("run_details")?.objects()?.map(::parseRun).orEmpty(),
+                    stable = t.optBoolean("stable", true),
+                    spread = t.optDouble("spread", 0.0),
+                    attempts = t.optInt("attempts", 1),
+                    ghz = t.optDouble("ghz", 0.0),
+                    waitMs = t.optInt("wait_ms", -1),
+                    recovered = t.optBoolean("recovered", true),
                 )
             }
             val diag = root.optJSONObject("diagnostics")
+            val scores = root.optJSONObject("scores")
+            val peak = scores?.optJSONObject("peak")
+            val sustained = scores?.optJSONObject("sustained")
             return BenchmarkResult(
                 benchmarkVersion = root.getString("benchmark_version"),
                 overallScore = root.getDouble("overall_score"),
+                peakScore = peak?.optDouble("score", 0.0) ?: root.getDouble("overall_score"),
+                sustainedScore = sustained?.optDouble("score", 0.0) ?: 0.0,
+                retention = scores?.optDouble("retention", 0.0) ?: 0.0,
+                peakStable = peak?.optBoolean("stable", true) ?: true,
+                sustainedStable = sustained?.optBoolean("stable", true) ?: true,
                 valid = root.getBoolean("valid"),
                 cancelled = root.getBoolean("cancelled"),
                 logicalCores = root.getJSONObject("config").getInt("logical_cores"),

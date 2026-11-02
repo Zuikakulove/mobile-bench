@@ -191,7 +191,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // JSON スキーマ (schema_version を変えたら UI 側のパーサも更新すること)
 //
 // {
-//   "schema_version": 4,
+//   "schema_version": 5,
 //   "benchmark_version": "0.1.0",
 //   "score_formula": "reference_ns / median_ns * 1000",
 //   "overall_score": 1234.567,          // 各テストスコアの幾何平均
@@ -213,13 +213,27 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // schema 3 (benchmark 0.1.1): cpu_cap_khz / conditions_before,after / summary_text を追加。
 //                             数値配列を 1 行で出力 (計測区間は変更なし)
 // schema 4 (benchmark 0.1.1): diagnostics に boost / clusters、負荷中クロック (ghz_load_*) を追加
+// schema 5 (benchmark 0.2.0): peak / sustained の 2 段階。scores / config.baseline_ghz / config.precondition、
+//                             tests[].phase / stable / spread / attempts / ghz / wait_ms / recovered を追加
 std::string to_json(const SuiteResult& r, bool pretty) {
   detail::JsonWriter w(pretty);
   w.begin_object();
-  w.key("schema_version"); w.value(4);
+  w.key("schema_version"); w.value(5);
   w.key("benchmark_version"); w.value(r.benchmark_version);
   w.key("score_formula"); w.value("reference_ns / median_ns * 1000");
-  w.key("overall_score"); w.value_fixed(r.overall_score, 3);
+  w.key("overall_score"); w.value_fixed(r.overall_score, 3);  // = scores.peak.score (互換用)
+  w.key("scores");
+  w.begin_object();
+  for (const auto& ph : r.phases) {
+    w.key(ph.name);
+    w.begin_object();
+    w.key("score"); w.value_fixed(ph.score, 3);
+    w.key("valid"); w.value(ph.valid);
+    w.key("stable"); w.value(ph.stable);
+    w.end_object();
+  }
+  w.key("retention"); w.value_fixed(r.retention, 4);
+  w.end_object();
   w.key("valid"); w.value(r.valid);
   w.key("cancelled"); w.value(r.cancelled);
 
@@ -229,6 +243,13 @@ std::string to_json(const SuiteResult& r, bool pretty) {
   w.key("measured_runs"); w.value(r.measured_runs);
   w.key("logical_cores"); w.value(r.logical_cores);
   w.key("diagnostics"); w.value(r.diagnostics_enabled);
+  w.key("baseline_ghz"); w.value_fixed(r.baseline_ghz, 3);
+  w.key("precondition");
+  w.begin_object();
+  w.key("ms"); w.value(r.precondition.ms);
+  w.key("ghz"); w.value_fixed(r.precondition.ghz, 3);
+  w.key("settled"); w.value(r.precondition.settled);
+  w.end_object();
   w.end_object();
 
   w.key("build");
@@ -256,6 +277,7 @@ std::string to_json(const SuiteResult& r, bool pretty) {
   w.begin_array();
   for (const auto& t : r.tests) {
     w.begin_object();
+    w.key("phase"); w.value(t.phase);
     w.key("id"); w.value(t.id);
     w.key("name"); w.value(t.name);
     w.key("category"); w.value(t.category);
@@ -269,6 +291,13 @@ std::string to_json(const SuiteResult& r, bool pretty) {
     w.key("median_ns"); w.value(t.median_ns);
     w.key("score"); w.value_fixed(t.score, 3);
     w.key("valid"); w.value(t.valid);
+    w.key("stable"); w.value(t.stable);
+    w.key("spread"); w.value_fixed(t.spread, 4);
+    w.key("attempts"); w.value(t.attempts);
+    w.key("ghz"); w.value_fixed(t.ghz, 3);
+    w.key("wait_ms"); w.value(t.wait_ms);
+    w.key("recovered"); w.value(t.recovered);
+    w.key("recovery_ghz"); w.value_fixed(t.recovery_ghz, 3);
     // 64bit 値は JavaScript/Swift の Double で精度落ちしないよう文字列で出す
     w.key("checksum"); w.value(std::to_string(t.checksum));
     w.key("expected_checksum"); w.value(std::to_string(t.expected_checksum));

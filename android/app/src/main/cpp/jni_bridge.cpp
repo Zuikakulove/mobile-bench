@@ -93,7 +93,7 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_mobilebench_app_bench_NativeLib
   jmethodID on_progress = nullptr;
   if (listener != nullptr) {
     jclass cls = env->GetObjectClass(listener);
-    on_progress = env->GetMethodID(cls, "onProgress", "(IIIILjava/lang/String;Z)V");
+    on_progress = env->GetMethodID(cls, "onProgress", "(IIIILjava/lang/String;ZLjava/lang/String;II)V");
     env->DeleteLocalRef(cls);
   }
 
@@ -101,8 +101,10 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_com_mobilebench_app_bench_NativeLib
   auto callback = [&](const mb::Progress& p) {
     if (on_progress == nullptr) return;
     jstring name = env->NewStringUTF(p.test_name.c_str());
+    jstring phase = env->NewStringUTF(p.phase.c_str());
     env->CallVoidMethod(listener, on_progress, p.step, p.total_steps, p.test_index, p.test_count, name,
-                        p.warmup ? JNI_TRUE : JNI_FALSE);
+                        p.warmup ? JNI_TRUE : JNI_FALSE, phase, p.wait_ms, p.attempt);
+    env->DeleteLocalRef(phase);
     env->DeleteLocalRef(name);
     if (env->ExceptionCheck()) {
       env->ExceptionDescribe();

@@ -10,6 +10,9 @@ namespace mb::detail {
 
 double estimate_clock_ghz();
 
+// 指定時間だけ CPU を 100% 使う (DVFS でクロックを上げる / 事前負荷用)
+void busy_spin_ms(int ms);
+
 // 負荷中に挟む短い版 (2 万加算 x 3 回の最大値、4GHz で計約 15µs)
 double quick_clock_ghz();
 

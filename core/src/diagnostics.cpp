@@ -187,7 +187,16 @@ ClusterMeasure run_cluster_measure(const std::string& kernel_name, const std::ve
   int ghz_threads = 0;
   bool all_pinned = true;
   std::uint64_t mask = 0;
-  for (const auto& r : per) {
+  for (size_t i = 0; i < per.size(); ++i) {
+    const auto& r = per[i];
+    // 固定に成功しても、OS がそのコアを止めている (例: 電力制御でプライムコアを休止) と
+    // 別のコアで動くことがある。実際に動いた CPU が指定の範囲内かも確認する
+    std::uint64_t requested = 0;
+    for (int c : masks[i]) {
+      if (c >= 0 && c < 64) requested |= std::uint64_t{1} << c;
+    }
+    const bool honored = r.pinned && r.cpu_mask != 0 && (r.cpu_mask & ~requested) == 0;
+    if (r.pinned && !honored) m.error = "pin ignored by OS (ran on other cores)";
     const double ms = r.ms_sum / units_per_thread;
     ms_total += ms;
     if (r.ghz_count > 0) {
@@ -195,7 +204,7 @@ ClusterMeasure run_cluster_measure(const std::string& kernel_name, const std::ve
       ++ghz_threads;
     }
     if (is_matmul && ms > 0) m.gflops += flops_per_unit / (ms * 1e6);
-    all_pinned = all_pinned && r.pinned;
+    all_pinned = all_pinned && honored;
     mask |= r.cpu_mask;
     if (!r.checksum_ok) m.error = "checksum mismatch";
   }

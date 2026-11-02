@@ -27,7 +27,7 @@ struct ContentView: View {
 
                     switch viewModel.state {
                     case .idle:
-                        Text("「計測開始」を押すと CPU テストを実行します (数十秒かかります)。充電中・高温時はスコアが変わることがあります。")
+                        Text("「計測開始」を押すと CPU テストを「ピーク」と「持続」の 2 段階で実行します (1〜5 分かかります)。充電中・高温時はスコアが変わることがあります。")
                     case .running(let info):
                         ProgressSection(info: info)
                     case .done(let result, let raw):
@@ -48,13 +48,22 @@ struct ContentView: View {
 private struct ProgressSection: View {
     let info: BenchmarkViewModel.RunningInfo
 
+    private var status: String {
+        if info.waitMs >= 0 {
+            return info.phase == "peak" ? "回復待ち \(info.waitMs / 1000) 秒 (最大 60 秒)" : "事前負荷 \(info.waitMs / 1000) 秒"
+        }
+        return info.warmup ? "ウォームアップ" : "本計測"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ProgressView(value: info.fraction)
             Text("\(Int(info.fraction * 100))%")
+            Text(phaseLabel(info.phase)).font(.subheadline.bold())
             if !info.testName.isEmpty {
                 let index = info.testIndex < info.testCount ? "(\(info.testIndex + 1)/\(info.testCount)) " : ""
-                Text("\(index)\(info.testName)  [\(info.warmup ? "ウォームアップ" : "本計測")]")
+                let retry = info.attempt > 1 ? " (測り直し \(info.attempt) 回目)" : ""
+                Text("\(index)\(info.testName)\(retry)  [\(status)]")
             }
             Text("計測中は他のアプリを操作しないでください。").font(.footnote)
         }
@@ -67,9 +76,15 @@ private struct ResultSection: View {
 
     var body: some View {
         VStack(spacing: 4) {
-            Text("総合スコア").font(.headline)
-            Text(formatScore(result.overallScore))
-                .font(.system(size: 48, weight: .bold, design: .rounded))
+            HStack {
+                ScoreColumn(label: "ピーク", score: result.scores?.peak?.score ?? result.overallScore,
+                            stable: result.scores?.peak?.stable ?? true)
+                ScoreColumn(label: "持続", score: result.scores?.sustained?.score ?? 0,
+                            stable: result.scores?.sustained?.stable ?? true)
+            }
+            if let retention = result.scores?.retention, retention > 0 {
+                Text("持続率 \(formatScore(retention * 100))%").font(.subheadline)
+            }
             Text("benchmark v\(result.benchmarkVersion)").font(.caption)
             if !result.valid {
                 Text(result.cancelled ? "中止されました" : "一部のテストが無効です (チェックサム不一致)")
@@ -91,7 +106,13 @@ private struct ResultSection: View {
                 .buttonStyle(.bordered)
         }
 
-        ForEach(result.tests) { t in TestCard(test: t) }
+        ForEach(["peak", "sustained"], id: \.self) { phase in
+            let tests = result.tests.filter { ($0.phase ?? "peak") == phase }
+            if !tests.isEmpty {
+                Text(phaseLabel(phase)).font(.headline)
+                ForEach(tests, id: \.key) { t in TestCard(test: t) }
+            }
+        }
 
         if let sweep = result.diagnostics?.matmulSweep, !sweep.isEmpty {
             SweepTable(points: sweep)
@@ -123,6 +144,15 @@ private struct TestCard: View {
     let test: BenchmarkResult.TestEntry
     @State private var expanded = false
 
+    private var detailLine: String {
+        var s = String(format: "median %.1f ms / threads %ld / %.2f GHz / ±%.1f%%", locale: posix,
+                       Double(test.medianNs) / 1e6, test.threads, test.ghz ?? 0, (test.spread ?? 0) * 100)
+        if let a = test.attempts, a > 1 { s += " / \(a) tries" }
+        if let w = test.waitMs, w >= 0 { s += " / wait \(w / 1000)s" + (test.recovered == false ? " (not recovered)" : "") }
+        if !test.valid { s += " / INVALID" }
+        return s
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -130,9 +160,12 @@ private struct TestCard: View {
                 Spacer()
                 Text(formatScore(test.score)).font(.headline)
             }
-            Text(String(format: "median %.1f ms / threads %ld", locale: posix,
-                        Double(test.medianNs) / 1e6, test.threads) + (test.valid ? "" : " / INVALID"))
+            Text(detailLine)
                 .font(.caption)
+            if test.stable == false && test.valid {
+                Text("計測中に端末の状態が変わり、ばらつきが大きいままでした (参考値)")
+                    .foregroundStyle(.red).font(.caption)
+            }
             if let e = test.error { Text(e).foregroundStyle(.red).font(.caption) }
             if let runs = test.runDetails, !runs.isEmpty {
                 DisclosureGroup("各回の内訳", isExpanded: $expanded) {
@@ -217,4 +250,30 @@ private func pad(_ s: String, _ width: Int, right: Bool = false) -> String {
 
 private func formatScore(_ score: Double) -> String {
     String(format: "%.0f", locale: posix, score)
+}
+
+private struct ScoreColumn: View {
+    let label: String
+    let score: Double
+    let stable: Bool
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label).font(.headline)
+            Text(formatScore(score))
+                .font(.system(size: 40, weight: .bold, design: .rounded))
+            if !stable { Text("不安定").font(.caption).foregroundStyle(.red) }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private func phaseLabel(_ phase: String) -> String {
+    switch phase {
+    case "prepare": return "準備 (基準クロックの測定)"
+    case "peak": return "ピーク (各テスト前に端末の回復を待って計測)"
+    case "sustained": return "持続 (全コアに負荷をかけた後、休まず計測)"
+    case "diagnostics": return "診断 (スコア対象外)"
+    default: return phase
+    }
 }

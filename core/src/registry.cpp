@@ -12,7 +12,9 @@ namespace {
 
 // 1 回の計測あたりの作業単位数 (処理量の定義。変更したら version.h を上げる)
 constexpr int kSingleThreadUnits = 4;
-constexpr int kMultiThreadWorkFactor = 16;  // マルチはシングルの 16 倍の総処理量
+// マルチはシングルの 4 倍の総処理量 (16 単位)。v0.1 は 16 倍だったが、全コア負荷が約 1 秒を超えると
+// 電力制御で大きく制限される端末があり、ピーク段階を短時間で終えるため v0.2.0 で 4 倍にした
+constexpr int kMultiThreadWorkFactor = 4;
 constexpr int kMultiThreadUnits = kSingleThreadUnits * kMultiThreadWorkFactor;
 
 bool selected(const RunConfig& config, const std::string& id) {

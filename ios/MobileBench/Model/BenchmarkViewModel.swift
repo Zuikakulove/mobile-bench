@@ -9,6 +9,9 @@ final class BenchmarkViewModel: ObservableObject {
         var testIndex: Int = 0
         var testCount: Int = 0
         var warmup: Bool = true
+        var phase: String = ""
+        var waitMs: Int = -1
+        var attempt: Int = 1
     }
 
     enum State {
@@ -45,13 +48,16 @@ final class BenchmarkViewModel: ObservableObject {
         // QoS は core のワーカースレッドと同じ userInitiated。
         // (ViewModel はアプリと同じ寿命なので self は強参照でよい)
         let thread = Thread {
-            let json = bridge.run { step, total, testIndex, testCount, testName, warmup in
+            let json = bridge.run { step, total, testIndex, testCount, testName, warmup, phase, waitMs, attempt in
                 let info = RunningInfo(
-                    fraction: total > 0 ? Double(step) / Double(total) : 0,
+                    fraction: total > 0 ? min(1, Double(step) / Double(total)) : 0,
                     testName: testName,
                     testIndex: testIndex,
                     testCount: testCount,
-                    warmup: warmup
+                    warmup: warmup,
+                    phase: phase,
+                    waitMs: waitMs,
+                    attempt: attempt
                 )
                 Task { @MainActor in
                     guard self.isRunning else { return }

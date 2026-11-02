@@ -3,8 +3,11 @@
 NS_ASSUME_NONNULL_BEGIN
 
 /// core からの進捗通知。計測スレッド (バックグラウンド) から呼ばれる。
+/// phase: "prepare" / "peak" / "sustained" / "diagnostics"
+/// waitMs: 回復待ち・事前負荷の経過時間 (それ以外は -1)、attempt: 測り直しの回数 (1 始まり)
 typedef void (^MBProgressHandler)(NSInteger step, NSInteger totalSteps, NSInteger testIndex, NSInteger testCount,
-                                  NSString *testName, BOOL warmup);
+                                  NSString *testName, BOOL warmup, NSString *phase, NSInteger waitMs,
+                                  NSInteger attempt);
 
 /// core の mb::Runner を包む Objective-C++ ブリッジ。計測ロジックは持たない。
 /// run と cancel を別スレッドから呼んでよい (cancel は core 側で atomic)。

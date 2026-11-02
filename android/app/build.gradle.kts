@@ -21,7 +21,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = ciRunNumber ?: 1
-        versionName = "0.1.1"
+        versionName = "0.2.0"
         buildConfigField("int", "BUILD_NUMBER", (ciRunNumber ?: 0).toString())
         buildConfigField("String", "GIT_SHA", "\"$gitShortSha\"")
 

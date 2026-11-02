@@ -237,7 +237,7 @@ TEST(runner_records_run_details_including_warmup) {
     EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
   }
   const std::string json = to_json(r, false);
-  EXPECT_TRUE(json.find("\"schema_version\":4") != std::string::npos);
+  EXPECT_TRUE(json.find("\"schema_version\":5") != std::string::npos);
   EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
   EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);
   EXPECT_TRUE(json.find("\"diagnostics\":{") == std::string::npos);  // 診断モードでなければ出さない
@@ -257,7 +257,7 @@ TEST(runner_records_conditions_and_summary) {
   EXPECT_EQ(r.tests[0].conditions_before.at("thermal_status"), std::string("1"));
   EXPECT_EQ(r.tests[0].conditions_after.at("thermal_status"), std::string("2"));
   // 要約: テスト ID、状態、各回の行が入る
-  EXPECT_TRUE(r.summary_text.find("[cpu.fake] median") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("[peak cpu.fake] median") != std::string::npos);
   EXPECT_TRUE(r.summary_text.find("cond power_save=false thermal_status=1 -> power_save=false thermal_status=2") !=
               std::string::npos);
   EXPECT_TRUE(r.summary_text.find("  W ") != std::string::npos);
@@ -341,4 +341,133 @@ TEST(inload_probe_records_load_clock) {
   }
 #endif
   t.teardown();
+}
+
+// ---- v0.2.0: peak / sustained の 2 段階 ----------------------------------------------
+
+namespace {
+
+// 指定時間だけ busy-wait する (sleep より時間が正確)。durations を順に繰り返す
+class SpinTest : public BenchmarkTest {
+ public:
+  SpinTest(std::string id, std::vector<int> durations_us) : id_(std::move(id)), durations_(std::move(durations_us)) {}
+  TestInfo info() const override { return {id_, id_, "fake", 2'000'000}; }
+  std::uint64_t run_once() override {
+    const int us = durations_[static_cast<size_t>(calls_++) % durations_.size()];
+    const auto end = std::chrono::steady_clock::now() + std::chrono::microseconds(us);
+    while (std::chrono::steady_clock::now() < end) {
+    }
+    return 7;
+  }
+  std::uint64_t expected_checksum() const override { return 7; }
+
+ private:
+  std::string id_;
+  std::vector<int> durations_;
+  int calls_ = 0;
+};
+
+RunPolicy fast_policy() {
+  RunPolicy p;
+  p.min_rest_ms = 20;
+  p.check_interval_ms = 20;
+  p.max_wait_ms = 100;
+  p.probe_load_ms = 5;
+  p.precondition_min_ms = 60;
+  p.precondition_max_ms = 120;
+  p.precondition_chunk_ms = 20;
+  return p;
+}
+
+}  // namespace
+
+TEST(full_procedure_runs_peak_then_sustained) {
+  RunConfig cfg;
+  cfg.policy = fast_policy();
+  cfg.threads = 2;
+  Runner runner(cfg);
+  std::vector<std::string> phases_seen;
+  SuiteResult r = runner.run_with_factory(
+      [] {
+        std::vector<TestPtr> v;
+        v.push_back(std::make_unique<SpinTest>("a", std::vector<int>{2000}));
+        v.push_back(std::make_unique<SpinTest>("b", std::vector<int>{4000}));
+        return v;
+      },
+      [&](const Progress& p) {
+        if (phases_seen.empty() || phases_seen.back() != p.phase) phases_seen.push_back(p.phase);
+      });
+  EXPECT_EQ(r.phases.size(), 2u);
+  EXPECT_EQ(r.phases[0].name, std::string("peak"));
+  EXPECT_EQ(r.phases[1].name, std::string("sustained"));
+  EXPECT_EQ(r.tests.size(), 4u);
+  EXPECT_EQ(r.tests[0].phase, std::string("peak"));
+  EXPECT_EQ(r.tests[3].phase, std::string("sustained"));
+  EXPECT_TRUE(r.valid);
+  // スコアは同じ基準時間で計算されるので、持続率は約 100%
+  EXPECT_NEAR(r.retention, 1.0, 0.1);
+  EXPECT_NEAR(r.overall_score, r.phases[0].score, 1e-9);
+  // peak は回復待ちをする / sustained は事前負荷をする
+  EXPECT_TRUE(r.tests[0].wait_ms >= 20);
+  EXPECT_EQ(r.tests[2].wait_ms, -1);
+  EXPECT_TRUE(r.precondition.ms >= 60 && r.precondition.ms <= 120);
+#if defined(__x86_64__) || defined(__aarch64__)
+  EXPECT_TRUE(r.baseline_ghz > 0.3);
+  EXPECT_TRUE(r.tests[0].recovered);
+#endif
+  EXPECT_TRUE(r.tests[0].stable);
+  EXPECT_EQ(r.tests[0].attempts, 1);
+  // 進捗は prepare -> peak -> sustained の順
+  EXPECT_TRUE(phases_seen.size() >= 3 && phases_seen[0] == "prepare" && phases_seen[1] == "peak" &&
+              phases_seen[2] == "sustained");
+  const std::string json = to_json(r, false);
+  EXPECT_TRUE(json.find("\"scores\":{\"peak\":{\"score\":") != std::string::npos);
+  EXPECT_TRUE(json.find("\"sustained\":{\"score\":") != std::string::npos);
+  EXPECT_TRUE(json.find("\"phase\":\"sustained\"") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("[sustained a] median") != std::string::npos);
+}
+
+TEST(unstable_test_is_retried_and_flagged) {
+  RunConfig cfg;
+  cfg.policy = fast_policy();
+  cfg.policy.sustained_phase = false;
+  cfg.threads = 1;
+  Runner runner(cfg);
+  SuiteResult r = runner.run_with_factory([] {
+    std::vector<TestPtr> v;
+    // 2ms と 4ms が交互 -> spread 100% (基準 6% を超える)
+    v.push_back(std::make_unique<SpinTest>("jumpy", std::vector<int>{2000, 4000}));
+    return v;
+  });
+  EXPECT_EQ(r.tests.size(), 1u);
+  EXPECT_EQ(r.tests[0].attempts, 3);  // 1 回 + 測り直し 2 回
+  EXPECT_TRUE(!r.tests[0].stable);
+  EXPECT_TRUE(r.tests[0].valid);      // 値は有効 (不安定の印が付くだけ)
+  EXPECT_TRUE(!r.phases[0].stable);
+  EXPECT_TRUE(r.summary_text.find("UNSTABLE attempts 3") != std::string::npos);
+}
+
+TEST(spread_and_stability_are_computed) {
+  RunConfig cfg;
+  cfg.policy = fast_policy();
+  cfg.policy.sustained_phase = false;
+  Runner runner(cfg);
+  SuiteResult r = runner.run_with_factory([] {
+    std::vector<TestPtr> v;
+    v.push_back(std::make_unique<SpinTest>("steady", std::vector<int>{3000}));
+    return v;
+  });
+  EXPECT_TRUE(r.tests[0].spread < 0.06);
+  EXPECT_TRUE(r.tests[0].stable);
+  EXPECT_EQ(r.tests[0].attempts, 1);
+}
+
+TEST(cluster_measure_flags_pin_as_honored_only_when_on_requested_cpu) {
+#if defined(__linux__)
+  ClusterMeasure m = detail::run_cluster_measure("sieve", {{0}}, 1);
+  EXPECT_TRUE(m.pinned);
+  EXPECT_TRUE(m.error.empty());
+#endif
+  ClusterMeasure u = detail::run_cluster_measure("sieve", {{}}, 1);  // 固定しない
+  EXPECT_TRUE(!u.pinned);
 }

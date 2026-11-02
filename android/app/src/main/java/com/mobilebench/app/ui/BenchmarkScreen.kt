@@ -122,10 +122,17 @@ private fun ProgressSection(s: UiState.Running) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         LinearProgressIndicator(progress = { s.fraction }, modifier = Modifier.fillMaxWidth())
         Text(String.format(Locale.ROOT, "%d%%", (s.fraction * 100).toInt()))
+        Text(phaseLabel(s.phase), style = MaterialTheme.typography.titleSmall)
         if (s.testName.isNotEmpty()) {
-            val phase = stringResource(if (s.warmup) R.string.phase_warmup else R.string.phase_measure)
             val index = if (s.testIndex < s.testCount) "(${s.testIndex + 1}/${s.testCount}) " else ""
-            Text("$index${s.testName}  [$phase]")
+            val retry = if (s.attempt > 1) " " + stringResource(R.string.retry_label, s.attempt) else ""
+            val status = when {
+                s.waitMs >= 0 && s.phase == "peak" -> stringResource(R.string.waiting_recovery, s.waitMs / 1000)
+                s.waitMs >= 0 -> stringResource(R.string.preconditioning, s.waitMs / 1000)
+                s.warmup -> stringResource(R.string.phase_warmup)
+                else -> stringResource(R.string.phase_measure)
+            }
+            Text("$index${s.testName}$retry  [$status]")
         }
         Text(stringResource(R.string.running_hint), style = MaterialTheme.typography.bodySmall)
     }
@@ -138,12 +145,16 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
     ) {
         Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(stringResource(R.string.overall_score), style = MaterialTheme.typography.titleMedium)
-            Text(
-                formatScore(result.overallScore),
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                ScoreColumn(stringResource(R.string.peak_score), result.peakScore, result.peakStable)
+                ScoreColumn(stringResource(R.string.sustained_score), result.sustainedScore, result.sustainedStable)
+            }
+            if (result.retention > 0) {
+                Text(
+                    stringResource(R.string.retention_label, String.format(Locale.ROOT, "%.0f", result.retention * 100)),
+                    style = MaterialTheme.typography.titleSmall,
+                )
+            }
             Text("benchmark v${result.benchmarkVersion}", style = MaterialTheme.typography.bodySmall)
             if (!result.valid) {
                 Text(
@@ -156,7 +167,13 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
 
     JsonActions(rawJson, result.summaryText)
 
-    result.tests.forEach { t -> TestCard(t) }
+    listOf("peak", "sustained").forEach { phase ->
+        val tests = result.tests.filter { it.phase == phase }
+        if (tests.isNotEmpty()) {
+            Text(phaseLabel(phase), style = MaterialTheme.typography.titleMedium)
+            tests.forEach { t -> TestCard(t) }
+        }
+    }
 
     if (result.sweep.isNotEmpty()) SweepTable(result)
 
@@ -172,7 +189,7 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
 
 @Composable
 private fun TestCard(t: BenchmarkResult.TestEntry) {
-    var expanded by rememberSaveable(t.id) { mutableStateOf(false) }
+    var expanded by rememberSaveable(t.phase + t.id) { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -182,13 +199,21 @@ private fun TestCard(t: BenchmarkResult.TestEntry) {
             Text(
                 String.format(
                     Locale.ROOT,
-                    "median %.1f ms / threads %d%s",
+                    "median %.1f ms / threads %d / %.2f GHz / ±%.1f%%%s%s%s",
                     t.medianNs / 1e6,
                     t.threads,
+                    t.ghz,
+                    t.spread * 100,
+                    if (t.attempts > 1) " / ${t.attempts} tries" else "",
+                    if (t.waitMs >= 0) " / wait ${t.waitMs / 1000}s" + (if (t.recovered) "" else " (not recovered)") else "",
                     if (t.valid) "" else " / INVALID",
                 ),
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (!t.stable && t.valid) {
+                Text(stringResource(R.string.unstable), color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall)
+            }
             t.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             if (t.runs.isNotEmpty()) {
                 TextButton(onClick = { expanded = !expanded }, modifier = Modifier.padding(0.dp)) {
@@ -318,3 +343,24 @@ private fun topologyLines(t: BenchmarkResult.Topology): List<String> {
 }
 
 private fun formatScore(score: Double): String = String.format(Locale.ROOT, "%.0f", score)
+
+@Composable
+private fun ScoreColumn(label: String, score: Double, stable: Boolean) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, style = MaterialTheme.typography.titleSmall)
+        Text(formatScore(score), fontSize = 40.sp, fontWeight = FontWeight.Bold)
+        if (!stable) {
+            Text(stringResource(R.string.unstable_short), color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun phaseLabel(phase: String): String = when (phase) {
+    "prepare" -> stringResource(R.string.phase_prepare)
+    "peak" -> stringResource(R.string.phase_peak)
+    "sustained" -> stringResource(R.string.phase_sustained)
+    "diagnostics" -> stringResource(R.string.phase_diagnostics)
+    else -> phase
+}

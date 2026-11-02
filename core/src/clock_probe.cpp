@@ -53,6 +53,22 @@ double estimate_clock_ghz() {
 #endif
 }
 
+void busy_spin_ms(int ms) {
+  using clock = std::chrono::steady_clock;
+  const auto end = clock::now() + std::chrono::milliseconds(ms);
+  std::uint64_t one = 1;
+  asm volatile("" : "+r"(one));
+  while (clock::now() < end) {
+#if defined(__aarch64__) || defined(__arm64__) || defined(__x86_64__)
+    volatile std::uint64_t sink = add_chain(1000, one);
+    (void)sink;
+#else
+    for (volatile int i = 0; i < 100000; ++i) {
+    }
+#endif
+  }
+}
+
 double quick_clock_ghz() {
 #if defined(__aarch64__) || defined(__arm64__) || defined(__x86_64__)
   using clock = std::chrono::steady_clock;

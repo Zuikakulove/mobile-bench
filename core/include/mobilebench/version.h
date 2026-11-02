@@ -10,10 +10,12 @@
 // 履歴:
 //   0.1.0  初版
 //   0.1.1  計測区間の前後にクロック推定と周波数の読み取りを追加 (計測区間の処理は同じ)
+//   0.2.0  ピーク / 持続の 2 段階に変更 (回復待ち・事前負荷・安定性判定と測り直し)。
+//          マルチスレッドの総処理量を 64 単位 → 16 単位。基準時間を取り直し
 #pragma once
 
 namespace mb {
 
-inline constexpr const char* kBenchmarkVersion = "0.1.1";
+inline constexpr const char* kBenchmarkVersion = "0.2.0";
 
 }  // namespace mb

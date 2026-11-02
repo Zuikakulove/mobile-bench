@@ -28,6 +28,9 @@ sealed interface UiState {
         val testIndex: Int,
         val testCount: Int,
         val warmup: Boolean,
+        val phase: String = "",
+        val waitMs: Int = -1,
+        val attempt: Int = 1,
     ) : UiState
     data class Done(val result: BenchmarkResult, val rawJson: String) : UiState
     data class Failed(val message: String, val rawJson: String?) : UiState
@@ -63,14 +66,18 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
                     ).use { bench ->
                         current = bench
                         try {
-                            val listener = ProgressListener { step, total, testIndex, testCount, testName, warmup ->
+                            val listener = ProgressListener {
+                                    step, total, testIndex, testCount, testName, warmup, phase, waitMs, attempt ->
                                 // StateFlow はスレッドセーフなのでバックグラウンドから直接更新してよい
                                 _state.value = UiState.Running(
-                                    fraction = if (total > 0) step.toFloat() / total else 0f,
+                                    fraction = if (total > 0) (step.toFloat() / total).coerceAtMost(1f) else 0f,
                                     testName = testName,
                                     testIndex = testIndex,
                                     testCount = testCount,
                                     warmup = warmup,
+                                    phase = phase,
+                                    waitMs = waitMs,
+                                    attempt = attempt,
                                 )
                             }
                             bench.run(listener, ConditionProvider { currentConditions() })

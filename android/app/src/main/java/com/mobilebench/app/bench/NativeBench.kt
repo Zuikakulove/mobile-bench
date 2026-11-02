@@ -1,8 +1,22 @@
 package com.mobilebench.app.bench
 
-/** core からの進捗通知。計測スレッド (バックグラウンド) から呼ばれる。 */
+/**
+ * core からの進捗通知。計測スレッド (バックグラウンド) から呼ばれる。
+ * phase: "prepare" / "peak" / "sustained" / "diagnostics"
+ * waitMs: 回復待ち・事前負荷の経過時間 (それ以外は -1)、attempt: 測り直しの回数 (1 始まり)
+ */
 fun interface ProgressListener {
-    fun onProgress(step: Int, totalSteps: Int, testIndex: Int, testCount: Int, testName: String, warmup: Boolean)
+    fun onProgress(
+        step: Int,
+        totalSteps: Int,
+        testIndex: Int,
+        testCount: Int,
+        testName: String,
+        warmup: Boolean,
+        phase: String,
+        waitMs: Int,
+        attempt: Int,
+    )
 }
 
 /**

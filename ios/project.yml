@@ -1,0 +1,54 @@
+# XcodeGen の定義。MobileBench.xcodeproj はこのファイルから生成する (リポジトリには含めない)。
+#   brew install xcodegen && cd ios && xcodegen generate
+name: MobileBench
+options:
+  bundleIdPrefix: com.mobilebench
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  MobileBench:
+    type: application
+    platform: iOS
+    sources:
+      - path: MobileBench
+      # Android / Linux と同一の core ソースをそのままコンパイルする
+      - path: ../core/src
+      - path: ../core/include
+        buildPhase: none
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mobilebench.app
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MobileBench
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        SWIFT_OBJC_BRIDGING_HEADER: MobileBench/Bridge/MobileBench-Bridging-Header.h
+        HEADER_SEARCH_PATHS:
+          - $(SRCROOT)/../core/include
+          - $(SRCROOT)/../core/src
+        CLANG_CXX_LANGUAGE_STANDARD: c++17
+        CLANG_CXX_LIBRARY: libc++
+        # ---- core のコンパイルフラグ (フラグプロファイル 1) ----------------------
+        # core/cmake/MobileBenchFlags.cmake (Android/Linux) と必ず揃えること。
+        # Debug / Release どちらの構成でも -O2 にする。
+        GCC_OPTIMIZATION_LEVEL: "2"
+        OTHER_CFLAGS:
+          - $(inherited)
+          - -ffp-contract=on
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - $(inherited)
+          - MB_FLAGS_PROFILE=1
+        # ---------------------------------------------------------------------
+        # 署名は CI のシミュレータビルドでは無効化する (xcodebuild 側で指定)
+        CODE_SIGN_STYLE: Automatic
+    scheme: {}

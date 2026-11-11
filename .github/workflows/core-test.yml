@@ -1,0 +1,46 @@
+name: Core tests
+
+on:
+  push:
+    paths:
+      - "core/**"
+      - ".github/workflows/core-test.yml"
+  pull_request:
+    paths:
+      - "core/**"
+      - ".github/workflows/core-test.yml"
+  workflow_dispatch:
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.compiler.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler:
+          - { name: gcc, cc: gcc, cxx: g++ }
+          - { name: clang, cc: clang, cxx: clang++ }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.compiler.cc }}
+          CXX: ${{ matrix.compiler.cxx }}
+        run: cmake -S core -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Unit tests
+        run: ctest --test-dir build --output-on-failure
+
+      - name: Run full benchmark (reference only)
+        # CI ランナーの値は参考値。チェックサムが全テストで一致することを確認する
+        run: ./build/mobilebench_cli --quiet > result-${{ matrix.compiler.name }}.json && cat result-${{ matrix.compiler.name }}.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-result-linux-${{ matrix.compiler.name }}
+          path: result-${{ matrix.compiler.name }}.json

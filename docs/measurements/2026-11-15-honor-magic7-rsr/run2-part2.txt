@@ -1,0 +1,47 @@
+MobileBench v0.2.1 | app 0.2.1 build 15 (7dcf4a1) | run 2026-11-15T10:05:34Z | part 2/2
+[diagnostics] cond battery_level=66 battery_temp_c=23.0 thermal_headroom_10s=0.32 -> battery_level=66 battery_temp_c=23.0
+  boost idle 1000ms (t_ms:GHz unit_ms cpu) 0:2.40G u49.1 cpu0 | 250:2.41G u49.2 cpu0 | 500:2.42G u49.5 cpu0 | 750:2.42G u49.1 cpu0 | 1000:2.42G u49.3 cpu0 | 1250:2.42G u49.1 cpu0 | 1500:2.42G u49.1 cpu0 | 1750:2.42G u49.3 cpu0
+  boost idle 4000ms (t_ms:GHz unit_ms cpu) 0:2.42G u49.1 cpu0 | 250:2.42G u50.1 cpu0 | 500:2.42G u49.3 cpu0 | 750:2.42G u49.1 cpu0 | 1000:2.42G u49.2 cpu0 | 1250:2.42G u49.2 cpu0 | 1500:2.42G u49.1 cpu0 | 1750:2.42G u49.1 cpu0
+  probe rest 2000ms load 100ms workers 8 | current = mean of per-worker estimate after load, counted = adds in 50-100ms / time (GHz, per-worker min-max)
+    2007ms current 2.400 (2.40-2.40) counted 1.862 (1.21-2.39)
+    4130ms current 2.401 (2.40-2.40) counted 1.647 (1.08-2.20)
+    6248ms current 2.400 (2.40-2.40) counted 1.692 (1.05-2.24)
+    8362ms current 2.401 (2.40-2.40) counted 1.662 (1.07-2.25)
+    10478ms current 2.401 (2.40-2.40) counted 1.617 (1.04-2.23)
+    12590ms current 2.360 (2.08-2.40) counted 1.692 (1.08-2.27)
+    14702ms current 2.401 (2.40-2.40) counted 1.702 (1.11-2.27)
+    16814ms current 2.401 (2.40-2.40) counted 1.720 (1.13-2.27)
+    18926ms current 2.909 (2.75-3.07) counted 2.739 (2.61-2.81)
+    21037ms current 2.400 (2.40-2.40) counted 1.775 (1.16-2.35)
+    23155ms current 2.401 (2.40-2.40) counted 1.683 (1.10-2.23)
+    25272ms current 2.400 (2.40-2.40) counted 1.663 (1.06-2.22)
+  probe 12 samples: current mean 2.440 range 22.5% | counted mean 1.788 range 62.8% (range = (max-min)/mean)
+  cluster: kernel threads ms/unit @GHz(load) = Mcycles/unit | matmul: GF, flops/cycle/thread (sieve: limit 40M, sieve1m: limit 1M, matmulN: n=N)
+  cpu6-7 max4320 cap1024:
+    sieve 1T(unpinned) 49.04ms @2.40G = 117.8Mc cpu2 error=pin ignored by OS (ran on other cores)
+    sieve 2T(unpinned) 49.07ms @2.41G = 118.2Mc cpu1,5 error=pin ignored by OS (ran on other cores)
+    matmul128 1T(unpinned) 0.84ms @2.36G = 2.0Mc | 4.98GF 2.11f/c cpu0,4 error=pin ignored by OS (ran on other cores)
+    matmul128 2T(unpinned) 0.83ms @2.41G = 2.0Mc | 10.09GF 2.09f/c cpu4-5 error=pin ignored by OS (ran on other cores)
+    sieve1m 1T(unpinned) 1.03ms @2.41G = 2.5Mc cpu5 error=pin ignored by OS (ran on other cores)
+    sieve1m 2T(unpinned) 1.06ms @2.41G = 2.6Mc cpu0-1,5 error=pin ignored by OS (ran on other cores)
+    matmul576 1T(unpinned) 72.02ms @2.39G = 172.1Mc | 5.31GF 2.22f/c cpu5 error=pin ignored by OS (ran on other cores)
+    matmul576 2T(unpinned) 72.99ms @2.40G = 175.2Mc | 10.47GF 2.18f/c cpu0,5 error=pin ignored by OS (ran on other cores)
+  cpu0-5 max3532 cap792:
+    sieve 1T 49.17ms @2.39G = 117.4Mc cpu1
+    sieve 6T(unpinned) 50.44ms @2.41G = 121.7Mc cpu0-5 error=pin ignored by OS (ran on other cores)
+    matmul128 1T 0.82ms @2.41G = 2.0Mc | 5.10GF 2.11f/c cpu0,4
+    matmul128 6T(unpinned) 0.86ms @2.41G = 2.1Mc | 29.14GF 2.01f/c cpu0-5 error=pin ignored by OS (ran on other cores)
+    sieve1m 1T 1.03ms @2.41G = 2.5Mc cpu1
+    sieve1m 6T(unpinned) 1.10ms @2.41G = 2.7Mc cpu0-5 error=pin ignored by OS (ran on other cores)
+    matmul576 1T 71.99ms @2.40G = 172.8Mc | 5.31GF 2.21f/c cpu4
+    matmul576 6T(unpinned) 74.40ms @2.41G = 179.1Mc | 30.83GF 2.13f/c cpu0-5 error=pin ignored by OS (ran on other cores)
+  n    ws1T     wsMT     1T_GF@GHz(cpu)   MT_GF@GHz   MT/1T  worker_units
+  64 96K 320K 5.01@2.41(cpu1) 28.71@2.41 5.72x [996,1005,1041,511,515,532,504,1000]
+  128 384K 1280K 4.99@2.42(cpu0) 29.00@2.41 5.81x [105,131,66,60,85,117,130,66]
+  192 864K 2880K 5.20@2.41(cpu1) 29.40@2.41 5.65x [33,19,38,38,21,19,37,19]
+  256 1536K 5120K 4.42@2.42(cpu0) 22.77@2.41 5.15x [16,8,16,8,8,8,16,16]
+  384 3456K 11520K 5.06@2.40(cpu0) 28.95@2.41 5.72x [5,5,3,5,3,3,5,3]
+  576 7776K 25920K 5.17@2.37(cpu0) 29.73@2.41 5.75x [4,4,5,3,5,3,3,5]
+  768 13824K 46080K 4.53@2.36(cpu1) 22.87@2.38 5.04x [5,3,4,4,3,5,4,4]
+  freq min/max MHz (3543 samples @100ms): 556/2745x6 1017/3072x2
+END part 2/2 chars=4075

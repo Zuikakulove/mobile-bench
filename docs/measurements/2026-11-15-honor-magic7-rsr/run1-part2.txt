@@ -1,0 +1,44 @@
+MobileBench v0.2.1 | app 0.2.1 build 15 (7dcf4a1) | run 2026-11-15T07:12:36Z | part 2/2
+  probe rest 2000ms load 100ms workers 8 | current = mean of per-worker estimate after load, counted = adds in 50-100ms / time (GHz, per-worker min-max)
+    2025ms current 2.400 (2.40-2.40) counted 1.874 (1.14-2.39)
+    4154ms current 2.401 (2.40-2.40) counted 1.817 (1.28-2.27)
+    6293ms current 2.401 (2.40-2.40) counted 1.678 (1.06-2.30)
+    8435ms current 2.401 (2.40-2.40) counted 1.666 (1.11-2.24)
+    10557ms current 2.400 (2.40-2.40) counted 1.671 (1.10-2.37)
+    12680ms current 2.401 (2.40-2.40) counted 1.710 (1.13-2.29)
+    14803ms current 2.401 (2.40-2.40) counted 1.698 (1.11-2.29)
+    16935ms current 2.401 (2.40-2.40) counted 1.734 (1.11-2.29)
+    19068ms current 2.400 (2.40-2.40) counted 1.755 (1.13-2.34)
+    21199ms current 2.401 (2.40-2.40) counted 1.763 (1.15-2.33)
+    23331ms current 2.400 (2.40-2.40) counted 1.690 (1.10-2.24)
+    25470ms current 2.400 (2.40-2.40) counted 1.839 (1.22-2.39)
+  probe 12 samples: current mean 2.401 range 0.0% | counted mean 1.741 range 11.9% (range = (max-min)/mean)
+  cluster: kernel threads ms/unit @GHz(load) = Mcycles/unit | matmul: GF, flops/cycle/thread (sieve: limit 40M, sieve1m: limit 1M, matmulN: n=N)
+  cpu6-7 max4320 cap1024:
+    sieve 1T(unpinned) 48.78ms @2.39G = 116.8Mc cpu5 error=pin ignored by OS (ran on other cores)
+    sieve 2T(unpinned) 48.99ms @2.41G = 118.3Mc cpu4-5 error=pin ignored by OS (ran on other cores)
+    matmul128 1T(unpinned) 0.83ms @2.39G = 2.0Mc | 5.03GF 2.11f/c cpu0-1,4 error=pin ignored by OS (ran on other cores)
+    matmul128 2T(unpinned) 0.85ms @2.38G = 2.0Mc | 9.89GF 2.08f/c cpu0-1,4-5 error=pin ignored by OS (ran on other cores)
+    sieve1m 1T(unpinned) 1.11ms @2.27G = 2.5Mc cpu0-1,5 error=pin ignored by OS (ran on other cores)
+    sieve1m 2T(unpinned) 1.05ms @2.42G = 2.5Mc cpu0-1 error=pin ignored by OS (ran on other cores)
+    matmul576 1T(unpinned) 72.31ms @2.40G = 173.6Mc | 5.29GF 2.20f/c cpu5 error=pin ignored by OS (ran on other cores)
+    matmul576 2T(unpinned) 72.96ms @2.41G = 175.8Mc | 10.48GF 2.17f/c cpu0,5 error=pin ignored by OS (ran on other cores)
+  cpu0-5 max3532 cap792:
+    sieve 1T 49.30ms @2.41G = 118.8Mc cpu0
+    sieve 6T(unpinned) 49.68ms @2.41G = 119.9Mc cpu0-5 error=pin ignored by OS (ran on other cores)
+    matmul128 1T 0.82ms @2.41G = 2.0Mc | 5.11GF 2.12f/c cpu1
+    matmul128 6T(unpinned) 0.86ms @2.41G = 2.1Mc | 29.31GF 2.02f/c cpu0-5 error=pin ignored by OS (ran on other cores)
+    sieve1m 1T 1.13ms @2.32G = 2.6Mc cpu0
+    sieve1m 6T(unpinned) 1.09ms @2.41G = 2.6Mc cpu0-5 error=pin ignored by OS (ran on other cores)
+    matmul576 1T 72.89ms @2.39G = 173.9Mc | 5.24GF 2.20f/c cpu0
+    matmul576 6T(unpinned) 73.76ms @2.41G = 177.4Mc | 31.09GF 2.15f/c cpu0-5 error=pin ignored by OS (ran on other cores)
+  n    ws1T     wsMT     1T_GF@GHz(cpu)   MT_GF@GHz   MT/1T  worker_units
+  64 96K 320K 5.00@2.41(cpu1) 28.74@2.41 5.74x [1010,519,516,650,975,1041,871,522]
+  128 384K 1280K 5.00@2.41(cpu0) 29.03@2.41 5.81x [102,89,62,67,122,127,127,64]
+  192 864K 2880K 5.13@2.42(cpu0) 29.73@2.41 5.79x [35,19,38,20,19,19,38,36]
+  256 1536K 5120K 4.43@2.41(cpu0) 22.74@2.42 5.13x [12,8,12,11,13,16,9,15]
+  384 3456K 11520K 5.21@2.42(cpu1) 28.61@2.41 5.50x [5,3,5,5,3,3,3,5]
+  576 7776K 25920K 5.17@2.40(cpu0) 30.08@2.40 5.82x [5,5,3,3,5,3,4,4]
+  768 13824K 46080K 4.46@2.42(cpu0) 23.14@2.39 5.19x [4,3,5,5,4,5,3,3]
+  freq min/max MHz (3205 samples @100ms): 556/2918x6 1017/4320x2
+END part 2/2 chars=3504

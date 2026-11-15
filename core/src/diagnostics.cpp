@@ -10,6 +10,7 @@
 #include "mobilebench/runner.h"
 #include "platform.h"
 #include "tests/cpu_kernels.h"
+#include "worker_pool.h"
 
 namespace mb::detail {
 
@@ -26,10 +27,42 @@ constexpr int kBoostIdleMs[] = {1000, 4000};  // 休止時間
 constexpr int kBoostLoadMs = 2000;            // 連続負荷の長さ
 constexpr size_t kBoostCount = sizeof(kBoostIdleMs) / sizeof(kBoostIdleMs[0]);
 
-constexpr int kClusterMatmulN = 128;           // キャッシュに収まるサイズ
-constexpr int kClusterSieveUnits = 6;          // 1 スレッドあたり (約 0.2〜0.35 秒)
-constexpr int kClusterMatmulUnits = 300;       // 1 スレッドあたり (約 0.1〜0.3 秒)
-constexpr int kMeasuresPerCluster = 4;         // sieve 1T / sieve NT / matmul 1T / matmul NT
+// クラスタ別の計測。各カーネルを 1 スレッドと N スレッド (コアごとに 1 本) で測る。
+// units は 1 スレッドあたりの単位数 (この前にウォームアップを 1 単位行う)
+struct ClusterSpec {
+  const char* kernel;
+  int units;
+};
+constexpr ClusterSpec kClusterSpecs[] = {
+    {"sieve", 6},        // 現行のスコア対象の単位 (上限 4000 万)。約 0.2〜0.35 秒
+    {"matmul128", 300},  // キャッシュに収まるサイズ。約 0.1〜0.3 秒
+    {"sieve1m", 60},     // 固定時間方式の単位の案 (上限 100 万。§6 V21)。約 0.1〜0.25 秒 (見込み)
+    {"matmul576", 3},    // 現行のスコア対象の単位 (n=576)。81 等分の案の元 (§6 V21)。遅いコアで約 2 秒 (見込み)
+};
+constexpr size_t kClusterSpecCount = sizeof(kClusterSpecs) / sizeof(kClusterSpecs[0]);
+constexpr int kMeasuresPerCluster = static_cast<int>(kClusterSpecCount) * 2;  // 1T と NT
+
+constexpr std::uint32_t kSieve1mLimit = 1'000'000;
+constexpr std::uint64_t kSieve1mPrimeCount = 78'498;  // pi(1,000,000)。ユニットテストで素朴な篩と照合する
+
+// kernel 名から、カーネルと 1 単位の浮動小数点演算数 (行列積以外は 0) を作る
+std::unique_ptr<UnitKernel> make_cluster_kernel(const std::string& name, double& flops_per_unit) {
+  flops_per_unit = 0.0;
+  if (name == "sieve") return std::make_unique<SieveKernel>();
+  if (name == "sieve1m") return std::make_unique<SieveKernel>(kSieve1mLimit, kSieve1mPrimeCount);
+  int n = 0;
+  if (name == "matmul128") n = 128;
+  if (name == "matmul576") n = kMatmulSize;
+  if (n == 0) return nullptr;
+  flops_per_unit = 2.0 * n * n * static_cast<double>(n);
+  return std::make_unique<MatmulKernel>(n);
+}
+
+void sleep_ms(int ms, const std::atomic<bool>& cancelled) {
+  for (int slept = 0; slept < ms && !cancelled.load(); slept += 50) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(std::min(50, ms - slept)));
+  }
+}
 
 std::int64_t now_ns() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
@@ -95,9 +128,62 @@ std::vector<std::vector<int>> cpu_clusters(const CpuTopology& t, int cpu_count) 
   return out;
 }
 
-int diagnostics_steps(size_t cluster_count) {
+int diagnostics_steps(size_t cluster_count, const DiagnosticsOptions& options) {
   const size_t groups = std::max<size_t>(cluster_count, 1);
-  return static_cast<int>(kBoostCount + groups * kMeasuresPerCluster + kSizeCount * 2 * (kWarmup + kRuns));
+  return static_cast<int>(kBoostCount + static_cast<size_t>(std::max(options.probe_samples, 0)) +
+                          groups * kMeasuresPerCluster + kSizeCount * 2 * (kWarmup + kRuns));
+}
+
+ClockProbeComparison run_clock_probe_comparison(int threads, int samples, int rest_ms, int load_ms,
+                                                const std::atomic<bool>& cancelled, const StepCallback& on_step) {
+  ClockProbeComparison out;
+  out.workers = std::max(threads, 1);
+  out.rest_ms = rest_ms;
+  out.load_ms = load_ms;
+  out.count_from_ms = load_ms / 2;  // 後半だけ数える (初期値: 100 ms のうち後半の 50 ms。§5.5)
+  WorkerPool pool(out.workers);
+  std::vector<double> current(static_cast<size_t>(out.workers));
+  std::vector<CountedSpin> counted(static_cast<size_t>(out.workers));
+  const std::int64_t t0 = now_ns();
+  for (int i = 0; i < samples && !cancelled.load(); ++i) {
+    on_step("Diagnostics: clock probe " + std::to_string(i + 1) + "/" + std::to_string(samples), false);
+    sleep_ms(rest_ms, cancelled);
+    if (cancelled.load()) break;
+    ClockProbeSample s;
+    s.t_ms = (now_ns() - t0) / 1'000'000;
+    // 現行の loaded_probe (runner.cpp) と同じ負荷と推定に、負荷の後半の加算の数え上げを足したもの
+    pool.run([&](int w) {
+      counted[static_cast<size_t>(w)] = busy_spin_counted(out.load_ms, out.count_from_ms);
+      current[static_cast<size_t>(w)] = estimate_clock_ghz();
+    });
+    double current_sum = 0.0;
+    int current_n = 0;
+    std::uint64_t adds = 0;
+    std::int64_t ns = 0;
+    bool first_counted = true;
+    for (size_t w = 0; w < current.size(); ++w) {
+      const double g = current[w];
+      if (g > 0) {
+        s.current_min = current_n == 0 ? g : std::min(s.current_min, g);
+        s.current_max = std::max(s.current_max, g);
+        current_sum += g;
+        ++current_n;
+      }
+      const CountedSpin& c = counted[w];
+      if (c.ns > 0) {
+        const double cg = static_cast<double>(c.adds) / static_cast<double>(c.ns);
+        s.counted_min = first_counted ? cg : std::min(s.counted_min, cg);
+        s.counted_max = std::max(s.counted_max, cg);
+        first_counted = false;
+        adds += c.adds;
+        ns += c.ns;
+      }
+    }
+    s.current_ghz = current_n > 0 ? current_sum / current_n : 0.0;
+    s.counted_ghz = ns > 0 ? static_cast<double>(adds) / static_cast<double>(ns) : 0.0;
+    out.samples.push_back(s);
+  }
+  return out;
 }
 
 BoostTrace run_boost_trace(int idle_ms, int load_ms, const std::atomic<bool>& cancelled) {
@@ -131,13 +217,13 @@ ClusterMeasure run_cluster_measure(const std::string& kernel_name, const std::ve
   m.kernel = kernel_name;
   m.threads = static_cast<int>(masks.size());
   m.units_per_thread = units_per_thread;
-  const bool is_matmul = kernel_name != "sieve";
-  std::unique_ptr<UnitKernel> kernel;
-  if (is_matmul) {
-    kernel = std::make_unique<MatmulKernel>(kClusterMatmulN);
-  } else {
-    kernel = std::make_unique<SieveKernel>();
+  double flops_per_unit = 0.0;
+  std::unique_ptr<UnitKernel> kernel = make_cluster_kernel(kernel_name, flops_per_unit);
+  if (!kernel) {
+    m.error = "unknown kernel";
+    return m;
   }
+  const bool is_matmul = flops_per_unit > 0;
   kernel->prepare(m.threads);
 
   struct alignas(64) PerThread {
@@ -182,7 +268,6 @@ ClusterMeasure run_cluster_measure(const std::string& kernel_name, const std::ve
   for (auto& t : threads) t.join();
   kernel->release();
 
-  const double flops_per_unit = is_matmul ? 2.0 * kClusterMatmulN * kClusterMatmulN * kClusterMatmulN : 0.0;
   double ms_total = 0.0, ghz_total = 0.0;
   int ghz_threads = 0;
   bool all_pinned = true;
@@ -256,7 +341,8 @@ std::vector<MatmulSweepPoint> run_matmul_sweep(int threads, const std::atomic<bo
 }
 
 void run_diagnostics(int threads, const CpuTopology& topology, const std::vector<std::vector<int>>& clusters,
-                     const std::atomic<bool>& cancelled, const StepCallback& on_step, Diagnostics& out) {
+                     const DiagnosticsOptions& options, const std::atomic<bool>& cancelled,
+                     const StepCallback& on_step, Diagnostics& out) {
   // 1. ブーストの持続 (休止の影響を見るため最初に行う)
   for (int idle : kBoostIdleMs) {
     if (cancelled.load()) return;
@@ -264,7 +350,12 @@ void run_diagnostics(int threads, const CpuTopology& topology, const std::vector
     out.boost.push_back(run_boost_trace(idle, kBoostLoadMs, cancelled));
   }
 
-  // 2. コアの種類ごとの性能
+  // 2. 状態を確かめるクロックの比較 (§6 V22)
+  if (cancelled.load()) return;
+  out.clock_probe = run_clock_probe_comparison(threads, options.probe_samples, options.probe_rest_ms,
+                                               options.probe_load_ms, cancelled, on_step);
+
+  // 3. コアの種類ごとの性能
   std::vector<std::vector<int>> groups = clusters;
   const bool pin = !groups.empty();
   if (!pin) {  // 固定できない環境: 全コアをまとめて 1 グループ (固定しない)
@@ -286,18 +377,18 @@ void run_diagnostics(int threads, const CpuTopology& topology, const std::vector
     std::vector<std::vector<int>> each;
     for (int c : cpus) each.push_back(pin ? std::vector<int>{c} : std::vector<int>{});
     std::string label = "Diagnostics: cluster cpu" + std::to_string(cpus.front()) + "-" + std::to_string(cpus.back());
-    on_step(label + " sieve 1T", false);
-    cr.measures.push_back(run_cluster_measure("sieve", one, kClusterSieveUnits));
-    on_step(label + " sieve " + std::to_string(each.size()) + "T", false);
-    cr.measures.push_back(run_cluster_measure("sieve", each, kClusterSieveUnits));
-    on_step(label + " matmul 1T", false);
-    cr.measures.push_back(run_cluster_measure("matmul128", one, kClusterMatmulUnits));
-    on_step(label + " matmul " + std::to_string(each.size()) + "T", false);
-    cr.measures.push_back(run_cluster_measure("matmul128", each, kClusterMatmulUnits));
+    for (const ClusterSpec& spec : kClusterSpecs) {
+      if (cancelled.load()) break;
+      on_step(label + " " + spec.kernel + " 1T", false);
+      cr.measures.push_back(run_cluster_measure(spec.kernel, one, spec.units));
+      if (cancelled.load()) break;
+      on_step(label + " " + spec.kernel + " " + std::to_string(each.size()) + "T", false);
+      cr.measures.push_back(run_cluster_measure(spec.kernel, each, spec.units));
+    }
     out.clusters.push_back(std::move(cr));
   }
 
-  // 3. 行列サイズの掃引
+  // 4. 行列サイズの掃引
   out.matmul_sweep = run_matmul_sweep(threads, cancelled, on_step);
 }
 

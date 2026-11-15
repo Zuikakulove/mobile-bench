@@ -118,6 +118,27 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
     w.end_object();
   }
   w.end_array();
+  w.key("clock_probe");
+  w.begin_object();
+  w.key("workers"); w.value(d.clock_probe.workers);
+  w.key("rest_ms"); w.value(d.clock_probe.rest_ms);
+  w.key("load_ms"); w.value(d.clock_probe.load_ms);
+  w.key("count_from_ms"); w.value(d.clock_probe.count_from_ms);
+  w.key("samples");
+  w.begin_array();
+  for (const auto& s : d.clock_probe.samples) {
+    w.begin_object();
+    w.key("t_ms"); w.value(s.t_ms);
+    w.key("current_ghz"); w.value_fixed(s.current_ghz, 3);
+    w.key("current_min"); w.value_fixed(s.current_min, 3);
+    w.key("current_max"); w.value_fixed(s.current_max, 3);
+    w.key("counted_ghz"); w.value_fixed(s.counted_ghz, 3);
+    w.key("counted_min"); w.value_fixed(s.counted_min, 3);
+    w.key("counted_max"); w.value_fixed(s.counted_max, 3);
+    w.end_object();
+  }
+  w.end_array();
+  w.end_object();
   w.key("clusters");
   w.begin_array();
   for (const auto& c : d.clusters) {
@@ -191,7 +212,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // JSON スキーマ (schema_version を変えたら UI 側のパーサも更新すること)
 //
 // {
-//   "schema_version": 5,
+//   "schema_version": 6,
 //   "benchmark_version": "0.1.0",
 //   "score_formula": "reference_ns / median_ns * 1000",
 //   "overall_score": 1234.567,          // 各テストスコアの幾何平均
@@ -208,6 +229,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 //                                   "cpu_khz_before", "cpu_khz_after" } ] } ],
 //   "cpu_topology": { "source", "max_khz", "capacity", "caches", "perf_levels" },
 //   "diagnostics": { "matmul_sweep": [...], "freq_samples": {...} }   // 診断モード時のみ
+//   "summary_parts": [ "...", ... ], "summary_text": "..."
 // }
 // schema 2 (benchmark 0.1.1): run_details / cpu_topology / diagnostics を追加
 // schema 3 (benchmark 0.1.1): cpu_cap_khz / conditions_before,after / summary_text を追加。
@@ -215,11 +237,15 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // schema 4 (benchmark 0.1.1): diagnostics に boost / clusters、負荷中クロック (ghz_load_*) を追加
 // schema 5 (benchmark 0.2.0): peak / sustained の 2 段階。scores / config.baseline_ghz / config.precondition、
 //                             tests[].phase / stable / spread / attempts / ghz / wait_ms / recovered を追加
+// schema 6 (benchmark 0.2.1): 要約をパートに分割 (summary_parts。summary_text は全パートをつないだもの)。
+//                             started_utc、diagnostics.clock_probe を追加。diagnostics.clusters[].measures[].kernel に
+//                             "sieve1m" / "matmul576" が加わった。device に OS のビルド (os_build など) が入る
 std::string to_json(const SuiteResult& r, bool pretty) {
   detail::JsonWriter w(pretty);
   w.begin_object();
-  w.key("schema_version"); w.value(5);
+  w.key("schema_version"); w.value(6);
   w.key("benchmark_version"); w.value(r.benchmark_version);
+  w.key("started_utc"); w.value(r.started_utc);
   w.key("score_formula"); w.value("reference_ns / median_ns * 1000");
   w.key("overall_score"); w.value_fixed(r.overall_score, 3);  // = scores.peak.score (互換用)
   w.key("scores");
@@ -320,7 +346,11 @@ std::string to_json(const SuiteResult& r, bool pretty) {
     write_diagnostics(w, r.diagnostics);
   }
 
-  // チャット等に貼るための要約 (内容は JSON の他のフィールドと同じ情報)
+  // チャット等に貼るための要約 (内容は JSON の他のフィールドと同じ情報)。パートごとにコピーする
+  w.key("summary_parts");
+  w.begin_array();
+  for (const auto& part : r.summary_parts) w.value(part);
+  w.end_array();
   w.key("summary_text"); w.value(r.summary_text);
 
   w.end_object();

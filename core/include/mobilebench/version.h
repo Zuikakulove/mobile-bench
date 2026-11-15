@@ -12,10 +12,13 @@
 //   0.1.1  計測区間の前後にクロック推定と周波数の読み取りを追加 (計測区間の処理は同じ)
 //   0.2.0  ピーク / 持続の 2 段階に変更 (回復待ち・事前負荷・安定性判定と測り直し)。
 //          マルチスレッドの総処理量を 64 単位 → 16 単位。基準時間を取り直し
+//   0.2.1  要約をパートに分割 (JSON の schema 6)。診断モードに、クラスタ別の篩 (上限 100 万) と
+//          行列積 (n=576)、状態を確かめるクロックの 2 つの求め方の比較を追加。OS のビルド番号を記録。
+//          計測区間・処理単位・計測手順・基準時間・フラグは 0.2.0 と同じ (docs/DESIGN.md §5.3 の PATCH)
 #pragma once
 
 namespace mb {
 
-inline constexpr const char* kBenchmarkVersion = "0.2.0";
+inline constexpr const char* kBenchmarkVersion = "0.2.1";
 
 }  // namespace mb

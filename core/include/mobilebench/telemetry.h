@@ -86,7 +86,7 @@ struct MatmulSweepPoint {
 // コアの種類ごとの性能 (診断)。Android / Linux ではスレッドをそのクラスタのコアに固定して測る。
 // 1 クロックあたりの性能 (Mcycles/unit, flops/cycle) で比べると、クロック状態の違いに左右されない。
 struct ClusterMeasure {
-  std::string kernel;          // "sieve" / "matmul128"
+  std::string kernel;          // "sieve" (上限 4000 万) / "sieve1m" (上限 100 万) / "matmul128" / "matmul576"
   int threads = 0;
   bool pinned = false;         // コアに固定できたか
   int units_per_thread = 0;
@@ -119,6 +119,28 @@ struct BoostTrace {
   std::vector<BoostSample> samples;
 };
 
+// 状態を確かめるクロックの、2 つの求め方の比較 (診断。docs/DESIGN.md §5.5、§6 V22)。
+// 同じ全コア負荷 1 回から、両方の値を求める。判定には使わない。
+//   current: 現行の求め方。負荷の直後に各ワーカーが短く推定した値 (estimate_clock_ghz) の平均
+//   counted: 案の求め方。負荷の後半に各ワーカーが回した加算の数の合計 ÷ 各ワーカーの時間の合計
+struct ClockProbeSample {
+  std::int64_t t_ms = 0;       // 比較の開始からの経過 (負荷の開始時点)
+  double current_ghz = 0.0;
+  double current_min = 0.0;    // ワーカーごとの値の最小 / 最大
+  double current_max = 0.0;
+  double counted_ghz = 0.0;
+  double counted_min = 0.0;
+  double counted_max = 0.0;
+};
+
+struct ClockProbeComparison {
+  int workers = 0;
+  int rest_ms = 0;             // 各回の負荷の前に休む時間 (ピーク段階の最低の休みと同じ)
+  int load_ms = 0;             // 全コアにかける負荷の長さ (ピーク段階の確認と同じ)
+  int count_from_ms = 0;       // counted で数え始める時刻 (負荷の開始から)
+  std::vector<ClockProbeSample> samples;
+};
+
 struct FreqSamples {
   int interval_ms = 0;
   std::vector<std::int64_t> t_ms;                // スイート開始からの経過時間
@@ -130,6 +152,7 @@ using Conditions = std::map<std::string, std::string>;
 
 struct Diagnostics {
   std::vector<BoostTrace> boost;
+  ClockProbeComparison clock_probe;
   std::vector<ClusterResult> clusters;
   std::vector<MatmulSweepPoint> matmul_sweep;
   FreqSamples freq;

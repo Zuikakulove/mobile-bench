@@ -36,6 +36,9 @@ std::vector<std::int64_t> read_cpu_cur_khz(int cpu_count);
 // 各コアの現在の周波数上限 [kHz] (scaling_max_freq。発熱・省電力で下げられる)。形式は同上
 std::vector<std::int64_t> read_cpu_cap_khz(int cpu_count);
 
+// 現在時刻 (UTC) を "2026-11-15T01:23:45Z" の形で返す。取れなければ空 (記録用。計測には使わない)
+std::string utc_timestamp();
+
 // CPU 構成 (最大周波数・capacity・キャッシュ)。取れるものだけ埋める。
 CpuTopology read_cpu_topology(int cpu_count);
 

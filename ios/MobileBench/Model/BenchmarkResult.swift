@@ -1,6 +1,6 @@
 import Foundation
 
-/// core が返す JSON (schema_version 5) の表示用モデル。
+/// core が返す JSON (schema_version 6) の表示用モデル。
 /// スコア計算などは一切行わず、JSON の値をそのまま読むだけ。
 struct BenchmarkResult: Decodable {
     struct Config: Decodable {
@@ -114,6 +114,15 @@ struct BenchmarkResult: Decodable {
     let cpuTopology: Topology?
     let diagnostics: Diagnostics?
     let summaryText: String?
+    /// 要約のパート (貼り付けで切れないよう core が分けたもの)。パートごとにコピーする
+    let summaryParts: [String]?
+
+    /// コピーボタンに出すパート (schema 5 以前の JSON では summary_text の 1 つ)
+    var copyableSummaryParts: [String] {
+        if let parts = summaryParts?.filter({ !$0.isEmpty }), !parts.isEmpty { return parts }
+        if let text = summaryText, !text.isEmpty { return [text] }
+        return []
+    }
 
     private struct ErrorOnly: Decodable { let error: String? }
 

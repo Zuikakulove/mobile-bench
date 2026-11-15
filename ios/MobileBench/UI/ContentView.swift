@@ -21,7 +21,7 @@ struct ContentView: View {
                                 .buttonStyle(.bordered)
                         }
                     }
-                    Toggle("診断モード (ブースト推移・コア種類別・行列サイズ掃引。スコアには影響しません。+30秒程度)", isOn: $viewModel.diagnostics)
+                    Toggle("診断モード (ブースト推移・クロック推定の比較・コア種類別・行列サイズ掃引。スコアには影響しません。+1分程度)", isOn: $viewModel.diagnostics)
                         .font(.subheadline)
                         .disabled(viewModel.isRunning)
 
@@ -95,9 +95,17 @@ private struct ResultSection: View {
         .padding()
         .background(Color.accentColor.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
 
-        if let summary = result.summaryText, !summary.isEmpty {
-            Button("要約をコピー (チャットに貼る用)") { UIPasteboard.general.string = summary }
-                .buttonStyle(.borderedProminent)
+        // 要約は core がパートに分けている (1 パート 8,000 文字以内)。パートごとにコピーボタンを出すだけにする
+        let parts = result.copyableSummaryParts
+        if parts.count > 1 {
+            Text("要約は \(parts.count) つのパートに分かれています。1 つずつコピーして、順に貼ってください (各パートの最後の行は「END」です)。")
+                .font(.caption)
+        }
+        ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+            Button(summaryButtonTitle(index: index, count: parts.count)) {
+                UIPasteboard.general.string = part
+            }
+            .buttonStyle(.borderedProminent)
         }
         HStack(spacing: 8) {
             Button("JSON をコピー") { UIPasteboard.general.string = rawJson }
@@ -122,6 +130,10 @@ private struct ResultSection: View {
         Text(buildInfoText)
             .font(.caption)
         RawJsonView(json: rawJson)
+    }
+
+    private func summaryButtonTitle(index: Int, count: Int) -> String {
+        count > 1 ? "要約 \(index + 1)/\(count) をコピー (チャットに貼る用)" : "要約をコピー (チャットに貼る用)"
     }
 
     private var buildInfoText: String {

@@ -145,6 +145,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   const RunPolicy& policy = config_.policy;
   SuiteResult suite;
   suite.benchmark_version = kBenchmarkVersion;
+  suite.started_utc = platform::utc_timestamp();
   suite.build = current_build_info();
   suite.device = config_.device;
   suite.warmup_runs = warmup_runs;
@@ -174,6 +175,10 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
 
   const int runs_per_test = warmup_runs + measured_runs;
   const auto clusters = detail::cpu_clusters(suite.topology, suite.logical_cores);
+  // 診断のクロック比較は、ピーク段階の確認と同じ休みと負荷の長さで行う (判定には使わない)
+  detail::DiagnosticsOptions diag_options;
+  diag_options.probe_rest_ms = policy.min_rest_ms;
+  diag_options.probe_load_ms = policy.probe_load_ms;
   Progress p;
   p.total_steps = 0;
   for (size_t i = 0; i < plans.size(); ++i) {
@@ -181,7 +186,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
     p.total_steps += n * runs_per_test + (plans[i].gate ? n : 0) + (plans[i].precondition ? 1 : 0);
   }
   if (full_procedure) p.total_steps += 1;  // 基準クロックの測定
-  if (diagnostics) p.total_steps += detail::diagnostics_steps(clusters.size());
+  if (diagnostics) p.total_steps += detail::diagnostics_steps(clusters.size(), diag_options);
 
   auto report = [&] {
     if (progress) progress(p);
@@ -387,7 +392,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
     p.attempt = 1;
     suite.diagnostics.conditions_before = probe_conditions();
     try {
-      detail::run_diagnostics(ctx.threads, suite.topology, clusters, cancelled_,
+      detail::run_diagnostics(ctx.threads, suite.topology, clusters, diag_options, cancelled_,
                               [&](const std::string& label, bool warmup) {
                                 p.test_name = label;
                                 p.warmup = warmup;
@@ -410,7 +415,9 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   if (suite.phases.size() >= 2 && suite.phases[0].score > 0 && suite.phases[1].valid) {
     suite.retention = suite.phases[1].score / suite.phases[0].score;
   }
-  suite.summary_text = make_summary_text(suite);
+  suite.summary_parts = make_summary_parts(suite);
+  suite.summary_text.clear();
+  for (const auto& part : suite.summary_parts) suite.summary_text += part;
 
   p.step = p.total_steps;
   p.warmup = false;

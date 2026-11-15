@@ -165,7 +165,7 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
         }
     }
 
-    JsonActions(rawJson, result.summaryText)
+    JsonActions(rawJson, result.summaryParts)
 
     listOf("peak", "sustained").forEach { phase ->
         val tests = result.tests.filter { it.phase == phase }
@@ -261,16 +261,25 @@ private fun SweepTable(result: BenchmarkResult) {
 }
 
 @Composable
-private fun JsonActions(rawJson: String, summary: String) {
+private fun JsonActions(rawJson: String, summaryParts: List<String>) {
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.copied)
-    // 要約 (数 KB) はチャットに貼っても切れない。JSON 全体は大きいので共有 (ファイル送信等) 向け
-    if (summary.isNotEmpty()) {
+    // 要約は core がパートに分けている (1 パート 8,000 文字以内。貼り付けで切れないように)。
+    // パートごとにコピーボタンを出すだけにする。JSON 全体は大きいので共有 (ファイル送信等) 向け
+    if (summaryParts.size > 1) {
+        Text(stringResource(R.string.summary_parts_hint, summaryParts.size), style = MaterialTheme.typography.bodySmall)
+    }
+    summaryParts.forEachIndexed { i, part ->
         Button(onClick = {
-            clipboard.setText(AnnotatedString(summary))
+            clipboard.setText(AnnotatedString(part))
             Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-        }) { Text(stringResource(R.string.copy_summary)) }
+        }) {
+            Text(
+                if (summaryParts.size > 1) stringResource(R.string.copy_summary_part, i + 1, summaryParts.size)
+                else stringResource(R.string.copy_summary)
+            )
+        }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = {

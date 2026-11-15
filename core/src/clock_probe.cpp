@@ -69,6 +69,37 @@ void busy_spin_ms(int ms) {
   }
 }
 
+CountedSpin busy_spin_counted(int load_ms, int count_from_ms) {
+  CountedSpin out;
+#if defined(__aarch64__) || defined(__arm64__) || defined(__x86_64__)
+  using clock = std::chrono::steady_clock;
+  constexpr std::uint64_t kChunkIterations = 1000;  // busy_spin_ms と同じ (1 回 10 万加算)
+  const auto t0 = clock::now();
+  const auto end = t0 + std::chrono::milliseconds(load_ms);
+  const auto from = t0 + std::chrono::milliseconds(count_from_ms);
+  std::uint64_t one = 1;
+  asm volatile("" : "+r"(one));
+  auto now = t0;
+  auto count_start = t0;
+  bool counting = false;
+  while (now < end) {
+    if (!counting && now >= from) {
+      counting = true;
+      count_start = now;
+    }
+    volatile std::uint64_t sink = add_chain(kChunkIterations, one);
+    (void)sink;
+    now = clock::now();
+    if (counting) out.adds += kChunkIterations * kAddsPerIteration;
+  }
+  if (counting) out.ns = std::chrono::duration_cast<std::chrono::nanoseconds>(now - count_start).count();
+#else
+  busy_spin_ms(load_ms);
+  (void)count_from_ms;
+#endif
+  return out;
+}
+
 double quick_clock_ghz() {
 #if defined(__aarch64__) || defined(__arm64__) || defined(__x86_64__)
   using clock = std::chrono::steady_clock;

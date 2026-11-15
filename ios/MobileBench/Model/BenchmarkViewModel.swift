@@ -118,15 +118,30 @@ final class BenchmarkViewModel: ObservableObject {
             String(decoding: raw.prefix(while: { $0 != 0 }), as: UTF8.self)
         }
         let device = UIDevice.current
-        return [
+        var info = [
             "platform": "ios",
             "manufacturer": "Apple",
             "model": machine,  // 例: "iPhone15,2" (シミュレータでは "arm64" / "x86_64")
             "model_name": device.model,
             "os_version": device.systemVersion,
+            // OS のビルド (docs/DESIGN.md D2)。表示用の文字列 (例 "Version 18.1 (Build 22B83)") も残す
+            "os_version_string": ProcessInfo.processInfo.operatingSystemVersionString,
             "app_version": AppInfo.version,
             "app_build": AppInfo.build,
         ]
+        // ビルド番号 (例 "22B83")。kern.osversion で取れると考えられるが、実機では未確認
+        if let build = sysctlString("kern.osversion") { info["os_build"] = build }
+        return info
+    }
+
+    private static func sysctlString(_ name: String) -> String? {
+        var size = 0
+        guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else { return nil }
+        var buffer = [CChar](repeating: 0, count: size)
+        guard sysctlbyname(name, &buffer, &size, nil, 0) == 0 else { return nil }
+        let bytes = buffer.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }
+        let value = String(decoding: bytes, as: UTF8.self)
+        return value.isEmpty ? nil : value
     }
 }
 

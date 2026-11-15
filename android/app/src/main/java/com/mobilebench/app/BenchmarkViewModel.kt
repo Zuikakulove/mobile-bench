@@ -157,6 +157,13 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
         put("manufacturer", Build.MANUFACTURER)
         put("model", Build.MODEL)
         put("os_version", Build.VERSION.RELEASE)
+        // OS のビルド (docs/DESIGN.md D2)。設定の「ビルド番号」に出る値は Build.DISPLAY と考えられる (未確認)。
+        // 確実に見分けられるよう、ビルド ID・インクリメンタル・フィンガープリントも記録する
+        put("os_build", Build.DISPLAY)
+        put("os_build_id", Build.ID)
+        put("os_incremental", Build.VERSION.INCREMENTAL)
+        put("os_security_patch", Build.VERSION.SECURITY_PATCH)
+        put("os_fingerprint", Build.FINGERPRINT)
         put("sdk_int", Build.VERSION.SDK_INT.toString())
         put("abi", Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

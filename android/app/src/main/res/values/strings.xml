@@ -26,13 +26,15 @@
     <string name="show_json">結果 JSON を表示</string>
     <string name="hide_json">結果 JSON を隠す</string>
     <string name="build_label">アプリ %1$s (build %2$d · %3$s)</string>
-    <string name="diagnostics_label">診断モード (ブースト推移・コア種類別・行列サイズ掃引。スコアには影響しません。+30秒程度)</string>
+    <string name="diagnostics_label">診断モード (ブースト推移・クロック推定の比較・コア種類別・行列サイズ掃引。スコアには影響しません。+1分程度)</string>
     <string name="show_runs">各回の内訳を表示</string>
     <string name="hide_runs">各回の内訳を隠す</string>
     <string name="sweep_title">診断: 行列サイズとキャッシュ</string>
     <string name="sweep_hint">WS = 作業領域 (A+B+C)。MT はスレッドごとに C を持つ。サイズが L2 を超えると GF (GFLOPS) が下がるかを見る。</string>
     <string name="freq_samples">周波数サンプル数: %1$d (0 の場合はこの端末では読み取り不可)</string>
     <string name="copy_summary">要約をコピー (チャットに貼る用)</string>
+    <string name="copy_summary_part">要約 %1$d/%2$d をコピー (チャットに貼る用)</string>
+    <string name="summary_parts_hint">要約は %1$d つのパートに分かれています。1 つずつコピーして、順に貼ってください (各パートの最後の行は「END」です)。</string>
     <string name="copy_json">JSON をコピー</string>
     <string name="share_json">共有</string>
     <string name="copied">コピーしました</string>

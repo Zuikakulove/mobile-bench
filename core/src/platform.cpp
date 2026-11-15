@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <thread>
 
 #if defined(__APPLE__)
@@ -35,6 +36,16 @@ std::string os_name() {
 #else
   return "unknown";
 #endif
+}
+
+std::string utc_timestamp() {
+  const std::time_t now = std::time(nullptr);
+  if (now == static_cast<std::time_t>(-1)) return {};
+  std::tm tm{};
+  if (gmtime_r(&now, &tm) == nullptr) return {};  // Android / iOS / Linux / macOS (POSIX)
+  char buf[32];
+  if (std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &tm) == 0) return {};
+  return buf;
 }
 
 std::string arch_name() {

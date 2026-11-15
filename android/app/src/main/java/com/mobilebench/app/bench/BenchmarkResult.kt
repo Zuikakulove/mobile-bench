@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * core が返す JSON (schema_version 5) の表示用モデル。
+ * core が返す JSON (schema_version 6) の表示用モデル。
  * スコア計算などは一切行わず、JSON の値を読んで表示しやすい形にまとめるだけ。
  */
 data class BenchmarkResult(
@@ -24,6 +24,8 @@ data class BenchmarkResult(
     val sweep: List<SweepPoint>,
     val freqSampleCount: Int,
     val summaryText: String,
+    /** 要約のパート (貼り付けで切れないよう core が分けたもの)。パートごとにコピーする */
+    val summaryParts: List<String>,
 ) {
     data class TestEntry(
         val phase: String,             // "peak" / "sustained"
@@ -118,6 +120,9 @@ data class BenchmarkResult(
                 sweep = diag?.optJSONArray("matmul_sweep")?.objects()?.map(::parseSweep).orEmpty(),
                 freqSampleCount = diag?.optJSONObject("freq_samples")?.optJSONArray("t_ms")?.length() ?: 0,
                 summaryText = root.optString("summary_text"),
+                summaryParts = root.optJSONArray("summary_parts")?.strings()?.filter { it.isNotEmpty() }
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: listOfNotNull(root.optString("summary_text").takeIf { it.isNotEmpty() }),
             )
         }
 
@@ -170,5 +175,6 @@ data class BenchmarkResult(
         private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }
         private fun JSONArray.ints(): List<Int> = (0 until length()).map { getInt(it) }
         private fun JSONArray.longs(): List<Long> = (0 until length()).map { getLong(it) }
+        private fun JSONArray.strings(): List<String> = (0 until length()).map { getString(it) }
     }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <string>
@@ -62,6 +63,7 @@ struct BuildInfo {
 
 struct SuiteResult {
   std::string benchmark_version;
+  std::string started_utc;  // 計測を始めた時刻 (UTC、例 "2026-11-15T01:23:45Z")。要約のパートの見出しで実行を見分ける
   BuildInfo build;
   std::map<std::string, std::string> device;  // プラットフォーム層から渡される機種情報
   int warmup_runs = 0;
@@ -78,10 +80,17 @@ struct SuiteResult {
   CpuTopology topology;
   bool diagnostics_enabled = false;
   Diagnostics diagnostics;  // diagnostics_enabled のときのみ JSON に出力
-  std::string summary_text; // 人が読む / チャットに貼るための要約 (summary.cpp)
+  // 人が読む / チャットに貼るための要約 (summary.cpp)。貼り付けで切れないよう複数のパートに分ける
+  std::vector<std::string> summary_parts;
+  std::string summary_text;  // summary_parts を順につないだもの
 };
 
-// 要約テキストを作る (Runner が自動で summary_text に入れる)
+// 要約の 1 パートの上限 (UTF-8 のバイト数。終端の行を含む)。docs/DESIGN.md §5.6
+inline constexpr std::size_t kSummaryPartMaxChars = 8000;
+
+// 要約をパートに分けて作る (Runner が自動で summary_parts / summary_text に入れる)
+std::vector<std::string> make_summary_parts(const SuiteResult& result, std::size_t max_chars = kSummaryPartMaxChars);
+// 全パートをつないだ要約
 std::string make_summary_text(const SuiteResult& result);
 
 std::string to_json(const SuiteResult& result, bool pretty = true);

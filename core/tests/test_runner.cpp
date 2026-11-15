@@ -237,7 +237,8 @@ TEST(runner_records_run_details_including_warmup) {
     EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
   }
   const std::string json = to_json(r, false);
-  EXPECT_TRUE(json.find("\"schema_version\":5") != std::string::npos);
+  EXPECT_TRUE(json.find("\"schema_version\":6") != std::string::npos);
+  EXPECT_TRUE(json.find("\"summary_parts\":[\"MobileBench v") != std::string::npos);
   EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
   EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);
   EXPECT_TRUE(json.find("\"diagnostics\":{") == std::string::npos);  // 診断モードでなければ出さない
@@ -256,10 +257,10 @@ TEST(runner_records_conditions_and_summary) {
   EXPECT_EQ(calls, 2);  // テスト開始時と終了時
   EXPECT_EQ(r.tests[0].conditions_before.at("thermal_status"), std::string("1"));
   EXPECT_EQ(r.tests[0].conditions_after.at("thermal_status"), std::string("2"));
-  // 要約: テスト ID、状態、各回の行が入る
+  // 要約: テスト ID、状態、各回の行が入る。状態は先頭に全項目、テストでは base と違う項目だけ
   EXPECT_TRUE(r.summary_text.find("[peak cpu.fake] median") != std::string::npos);
-  EXPECT_TRUE(r.summary_text.find("cond power_save=false thermal_status=1 -> power_save=false thermal_status=2") !=
-              std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("\ncond(base) power_save=false thermal_status=1\n") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("\n  cond = -> thermal_status=2\n") != std::string::npos);
   EXPECT_TRUE(r.summary_text.find("  W ") != std::string::npos);
   EXPECT_TRUE(r.summary_text.find("  #5 ") != std::string::npos);
   const std::string json = to_json(r, true);

@@ -22,12 +22,14 @@ iOS と Android の端末性能を、同じ数値の基準で比べるベンチ�
 ```bash
 cmake -S core -B build && cmake --build build --parallel
 ctest --test-dir build --output-on-failure        # 約 1 分半
-./build/mobilebench_tests <テスト名の一部>          # ユニットテストを絞って実行
+./build/tests/mobilebench_tests <テスト名の一部>    # ユニットテストを絞って実行
 ./build/mobilebench_cli --only cpu.single.sieve   # 1 テストだけ計測して JSON を出力
 ```
 
 - core を変更したら、コミット前に上の `ctest` を通す。
 - Android / iOS はこの環境ではビルドできない。push 後に GitHub Actions の結果で確認する。
+- CI は、3 か所のバージョンの一致(`.github/scripts/check_versions.py`)、JNI の宣言(`check_jni.py`)、CLI の JSON を Kotlin と Swift のパーサに読ませる検査、`analyze_summary.py --strict` を行う。版、JNI、JSON の形、要約の書式を変えたら、push の前に手元で該当するスクリプトを実行する。
+- Android の CI は、カーネルの関数とループの位置(`kernel_layout.py`)を成果物 `kernel-layout` に出す(`docs/DESIGN.md` §6 C8)。iOS の CI は Xcode 26.6(17F113)に固定してあり、イメージの版が変わると失敗する。
 - 実機の結果は、アプリの「要約をコピー」のテキストで受け取る(JSON 全体はチャットで途切れる)。
   - 貼り付けは 1 回 10,000 文字で切れる。0.2.1 から、要約は core が 8,000 バイト(UTF-8)以内のパートに分ける(`docs/DESIGN.md` §5.6)。全パートを受け取り、各パートの終端の行(`END part i/n chars=…`)で欠けがないことを確かめる。0.2.0 の診断モードの要約は、末尾(行列サイズ掃引の表と周波数の行)が欠けている。
   - 受け取った要約は、書き換えずに `docs/measurements/<日付>-<端末>/` に保存する。数値は `docs/measurements/tools/analyze_summary.py` で取り出す(パートの欠けと切れも検査する)。

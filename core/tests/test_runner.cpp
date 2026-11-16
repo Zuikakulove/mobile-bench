@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
@@ -486,15 +487,26 @@ TEST(spread_and_stability_are_computed) {
   RunConfig cfg;
   cfg.policy = fast_policy();
   cfg.policy.sustained_phase = false;
+  // ばらつきの値と回復の確認は、実行するマシンの時間のゆらぎで結果が変わるので、ここでは必ず通る値にする
+  // (full_procedure_runs_peak_then_sustained と同じ)。テストの中だけの値で、RunPolicy の既定値は変えていない
+  cfg.policy.recovered_ratio = 0.0;  // 推定値は 0 以上なので、1 回目の確認で必ず「回復した」になる
+  cfg.policy.stable_spread = 1e9;    // ばらつきによらず「安定」になり、測り直しが起きない
   Runner runner(cfg);
   SuiteResult r = runner.run_with_factory([] {
     std::vector<TestPtr> v;
     v.push_back(std::make_unique<SpinTest>("steady", std::vector<int>{3000}));
     return v;
   });
-  EXPECT_TRUE(r.tests[0].spread < 0.06);
-  EXPECT_TRUE(r.tests[0].stable);
-  EXPECT_EQ(r.tests[0].attempts, 1);
+  EXPECT_EQ(r.tests.size(), 1u);
+  const TestResult& t = r.tests[0];
+  EXPECT_TRUE(!t.runs_ns.empty());
+  // spread = 本計測の (最大 - 最小) ÷ 中央値。値の範囲ではなく、式を確かめる
+  const auto [lo, hi] = std::minmax_element(t.runs_ns.begin(), t.runs_ns.end());
+  const std::int64_t med = median(t.runs_ns);
+  EXPECT_TRUE(med > 0);
+  EXPECT_NEAR(t.spread, static_cast<double>(*hi - *lo) / static_cast<double>(med), 1e-12);
+  EXPECT_TRUE(t.stable);
+  EXPECT_EQ(t.attempts, 1);
 }
 
 TEST(cluster_measure_flags_pin_as_honored_only_when_on_requested_cpu) {

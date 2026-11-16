@@ -5,10 +5,14 @@ on:
     paths:
       - "core/**"
       - ".github/workflows/core-test.yml"
+      - "docs/measurements/tools/**"
+      - ".github/scripts/**"
   pull_request:
     paths:
       - "core/**"
       - ".github/workflows/core-test.yml"
+      - "docs/measurements/tools/**"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 jobs:
@@ -44,3 +48,49 @@ jobs:
         with:
           name: core-result-linux-${{ matrix.compiler.name }}
           path: result-${{ matrix.compiler.name }}.json
+
+  tools:
+    # バージョンの一致と、要約の解析スクリプト (docs/measurements/tools/analyze_summary.py) の検査
+    name: Versions and summary analyzer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check versions (version.h / build.gradle.kts / project.yml)
+        run: python3 -I .github/scripts/check_versions.py
+
+      - name: Analyze saved device records
+        # 0.2.1 の記録 (パートに分けた要約) は --strict で通ること。
+        # 0.2.0 の記録は途中で切れている (docs/measurements/README.md) ので、--strict なしで例外が出ないこと。
+        # 記録を足したら、ここに足す
+        run: |
+          set -euo pipefail
+          A=docs/measurements/tools/analyze_summary.py
+          for d in docs/measurements/2026-11-15-*/; do
+            echo "== --strict ${d}"
+            if ! python3 -I "$A" --strict "${d}"run*.txt > analyze.log; then cat analyze.log; exit 1; fi
+            grep -E '^(=====|!!|\?\?|files )' analyze.log || true
+          done
+          for d in docs/measurements/2026-11-12-*/; do
+            echo "== (without --strict) ${d}"
+            if ! python3 -I "$A" "${d}"run*.txt > analyze.log; then cat analyze.log; exit 1; fi
+            grep -E '^(=====|!!|\?\?|files )' analyze.log || true
+          done
+
+      - name: Build core CLI
+        run: |
+          cmake -S core -B build -DCMAKE_BUILD_TYPE=Release -DMB_BUILD_TESTS=OFF
+          cmake --build build --parallel --target mobilebench_cli
+
+      - name: Analyze the CLI summary (diagnostics) with --strict
+        run: |
+          set -euo pipefail
+          ./build/mobilebench_cli --only cpu.single.sieve --diagnostics --quiet > cli-diagnostics.json
+          mkdir -p cli-summary
+          python3 -I -c 'import json, sys
+          parts = json.load(open(sys.argv[1]))["summary_parts"]
+          assert parts, "summary_parts is empty"
+          for i, p in enumerate(parts, 1):
+              open(f"{sys.argv[2]}/part{i}.txt", "w", encoding="utf-8").write(p)
+          print(len(parts), "part(s)")' cli-diagnostics.json cli-summary
+          python3 -I docs/measurements/tools/analyze_summary.py --strict cli-summary/part*.txt

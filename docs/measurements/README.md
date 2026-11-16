@@ -30,6 +30,8 @@ python3 -I docs/measurements/tools/simulate_units.py
 
 `analyze_summary.py` は、0.2.1 以降のパートに分けた要約と、0.2.0 の 1 本の要約の両方を読む(書式は `core/src/summary.cpp`)。パートは、別々のファイルでも 1 つのファイルに続けたものでもよい。同じ実行のパートを見出しでまとめ、欠けたパート、終端の行がないパート、文字数の合わないパートを `!!` で報告する。0.2.1 の診断モードの要約からは、クラスタ別の単位の案(§6 V21)と、状態を確かめるクロックの 2 つの求め方の比較(§6 V22)も出す。書式を変えたら、こちらも直す。
 
+解釈できない行は `??` を付けて出す。`--strict` を付けると、`!!` の問題、テストが 1 本も読めない実行、解釈できない行のどれかがあれば、終了コード 1 で終わる。CI(`core-test.yml`)は、0.2.1 の記録と CLI の要約を `--strict` で、0.2.0 の記録(途中で切れている)を `--strict` なしで読ませる。記録のディレクトリを足したら、`core-test.yml` の「Analyze saved device records」にも足す。
+
 ```bash
 python3 -I docs/measurements/tools/analyze_summary.py docs/measurements/<日付>-<端末>/run1-part*.txt
 ```

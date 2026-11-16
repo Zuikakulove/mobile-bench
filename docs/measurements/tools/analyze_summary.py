@@ -10,8 +10,16 @@
 見る観点: V2・V3・V7 (テストごとの時間、busy、回復待ち)、V21 (クラスタ別の単位の案)、
 V22 (状態を確かめるクロックの 2 つの求め方)。
 
-使い方: python3 -I analyze_summary.py run1-part1.txt run1-part2.txt [run2.txt ...]
+解釈できない行は「?? 」を付けて出す。読み飛ばす行 (columns:、行列サイズ掃引の表など) は、既知の行として扱う。
+
+--strict: 次のどれかがあれば、終了コード 1 で終わる (CI の検査用。docs/PHASE1_PLAN.md P3.16)。
+  - 「!!」の問題 (パートの欠け、切れ、終端の行の文字数の不一致、行の切れ)
+  - テストが 1 本も読めない実行
+  - 解釈できない行
+
+使い方: python3 -I analyze_summary.py [--strict] run1-part1.txt run1-part2.txt [run2.txt ...]
 """
+import argparse
 import re
 import statistics
 import sys
@@ -82,6 +90,24 @@ def split_runs(paths):
     return out
 
 
+# 中身は使わないが、書式どおりの行として認める行 (core/src/summary.cpp)
+KNOWN_LINES = [
+    re.compile(r"^$"),
+    re.compile(r"^MobileBench v\S+ \| app .*"),  # 0.2.0 の見出し (0.2.1 以降は split_runs が読む)
+    re.compile(r"^scores .* valid=(yes|no)( CANCELLED)? cores=\d+ diag=(yes|no)$"),
+    re.compile(r"^columns: run time cpu .*"),
+    re.compile(r"^cond: only keys that differ from cond\(base\) .*"),
+    re.compile(r"^\[diagnostics\]( cond .* -> .*)?$"),
+    re.compile(r"^  probe \d+ samples: current mean .* \| counted mean .*"),
+    re.compile(r"^  cluster: kernel threads ms/unit .*"),
+    re.compile(r"^  n +ws1T +wsMT +1T_GF@GHz\(cpu\) +MT_GF@GHz +MT/1T +worker_units$"),
+    # 行列サイズ掃引の行: n ws1T wsMT 1T_GF@GHz(cpu) MT_GF@GHz MT/1T [worker_units]
+    re.compile(r"^  \d+ \d+K \d+K [\d.]+@[\d.]+\(cpu\S+\) [\d.]+@[\d.]+ [\d.]+x( INVALID)? \[[\d,]*\]$"),
+    re.compile(r"^  freq min/max MHz \(\d+ samples @\d+ms\): .*"),
+    re.compile(r"^  freq samples: none .*"),
+]
+
+
 def parse_conditions(text):
     if text in ("-", "="):
         return {}
@@ -96,10 +122,15 @@ def parse(key, run, lines):
     out = {"key": key, "paths": sorted(run["paths"]), "parts": len(run["parts"]), "total_parts": run["total"],
            "problems": run["problems"], "legacy": run["legacy"],
            "chars": run.get("chars", sum(len(ln) + 1 for ln in lines)),
-           "tests": [], "boost": [], "clusters": [], "probe": [], "cond_base": {}}
+           "tests": [], "boost": [], "clusters": [], "probe": [], "cond_base": {}, "unknown": []}
     cur = None
     cluster = None
     for ln in lines:
+        if ln.endswith(" [cut]"):  # 1 行だけでパートの上限を超えたので、core が切った行
+            out["problems"].append(f"行が切れている: {ln[:60]}…")
+            continue
+        if ln.startswith("freq") or ln.startswith("  freq"):
+            out["freq_line"] = True
         m = re.match(r"device: (.*?) (\S+) (\S+)(?: build=(.*?))? \| (.*)", ln)
         if m and "device" not in out:
             out["device"] = ln[len("device: "):]
@@ -119,9 +150,11 @@ def parse(key, run, lines):
             out["precondition_ms"] = int(m.group(2))
             out["precondition_ghz"] = float(m.group(3))
             out["settled"] = m.group(4)
+            continue
         m = re.match(r"topology max_mhz (.*) capacity (.*)", ln)
         if m:
             out["max_mhz"], out["capacity"] = m.group(1), m.group(2)
+            continue
         m = re.match(
             r"\[(peak|sustained) (\S+)\] median ([\d.]+)ms score ([\d.]+) threads (\d+) @([\d.]+)G spread ([\d.]+)%"
             r"( UNSTABLE)? attempts (\d+)(?: wait (\d+)ms(\(NOT recovered\))? rec ([\d.]+)G)?",
@@ -197,6 +230,16 @@ def parse(key, run, lines):
                 "gf": float(m.group(7)) if m.group(7) else None, "fc": float(m.group(8)) if m.group(8) else None,
                 "cpus": m.group(9), "error": m.group(10).strip() if m.group(10) else None,
             })
+            continue
+        if any(k.match(ln) for k in KNOWN_LINES):
+            continue
+        out["unknown"].append(ln)
+    if not out["tests"]:
+        out["problems"].append("テストが 1 本も読めない")
+    # 0.2.0 の診断モードの要約は 10,000 文字で切れていて、末尾 (周波数の行) がない (docs/DESIGN.md §1.7 (8))
+    if out["legacy"] and re.search(r"^scores .* diag=yes", "\n".join(lines), flags=re.MULTILINE) \
+            and not out.get("freq_line"):
+        out["problems"].append("末尾 (周波数の行) がない (切れている)")
     return out
 
 
@@ -210,6 +253,8 @@ def report(r):
     print(f"files {r['paths']} | parts {r['parts']}/{r['total_parts']} | body {r['chars']} chars")
     for p in r["problems"]:
         print(f"!! {p}")
+    for ln in r["unknown"]:
+        print(f"?? {ln}")
     if "device" in r:
         print(f"device {r['device']}")
     if "os" in r:
@@ -298,7 +343,12 @@ def report(r):
 
 
 def main():
-    results = [parse(*x) for x in split_runs(sys.argv[1:])]
+    ap = argparse.ArgumentParser(description="MobileBench の要約テキストを読み、実機検証の観点の数値を出す")
+    ap.add_argument("--strict", action="store_true",
+                    help="「!!」の問題、テストのない実行、解釈できない行があれば終了コード 1 にする")
+    ap.add_argument("files", nargs="+")
+    args = ap.parse_args()
+    results = [parse(*x) for x in split_runs(args.files)]
     for r in results:
         report(r)
     # まとめ: 全コアのプローブのばらつき (現行の求め方。回復の確認と事前負荷に使われた値)
@@ -321,6 +371,14 @@ def main():
     for k, v in by.items():
         d = (max(v) - min(v)) / min(v) * 100 if min(v) > 0 else 0.0
         print(f"{k[0]:9s} {k[1]:18s} {v} 差 {d:.1f}%")
+    bad = [r for r in results if r["problems"] or r["unknown"]]
+    if bad:
+        print()
+        print("-- 検査")
+        for r in bad:
+            print(f"{r['key']}: 問題 {len(r['problems'])} 件、解釈できない行 {len(r['unknown'])} 行")
+        if args.strict:
+            sys.exit(1)
 
 
 if __name__ == "__main__":

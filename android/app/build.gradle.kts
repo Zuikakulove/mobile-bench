@@ -89,4 +89,9 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
+
+    // JVM のユニットテスト (src/test)。android.jar の org.json は中身のないスタブなので、
+    // BenchmarkResult.parse を JVM で動かすために本物の org.json を足す (docs/PHASE1_PLAN.md J7 の 2)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20260814")
 }

@@ -1,0 +1,121 @@
+name: Kernel layout (build 12 / 15)
+
+# 一度だけの比較 (docs/PHASE1_PLAN.md J9、docs/DESIGN.md §6 C8)。
+# 実機で使った 2 つの APK (0.2.0 build 12 = コミット 8145938、0.2.1 build 15 = コミット 7dcf4a1) を、
+# 同じコミットから CI でビルドし直し、APK の libmobilebench_jni.so と .text が一致するかを確かめる。
+# あわせて、両方のカーネルの関数とループの位置を出す。原因の判断はしない (事実だけを出す)。
+# 実機で使った APK の成果物は期限で消える (build 12 は 2026-12-11、build 15 は 2026-12-15。UTC)。
+on:
+  push:
+    paths:
+      - ".github/workflows/kernel-layout.yml"
+      - ".github/scripts/kernel_layout.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read  # 別の実行の成果物 (実機で使った APK) を読むため
+
+env:
+  NDK_VERSION: "27.2.12479018"
+
+jobs:
+  rebuild:
+    name: Rebuild build ${{ matrix.build }} (${{ matrix.version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { build: 12, version: "0.2.0", sha: 81459380084adcf78956a54be0e7ec4aeb672f53, run_id: 42952127373 }
+          - { build: 15, version: "0.2.1", sha: 7dcf4a18bc8685c2d373644199ce809da5a8eca9, run_id: 43670028049 }
+    steps:
+      # 元のビルドと同じ場所 (ワークスペースの直下) に取り出す。パスの違いで .so が変わらないようにする
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.sha }}
+          fetch-depth: 0
+
+      - name: Take the layout script from this commit
+        # 古いコミットにはスクリプトがないので、この実行のコミットから取り出す (ワークスペースの外に置く)
+        run: |
+          git show "${GITHUB_SHA}:.github/scripts/kernel_layout.py" > "${RUNNER_TEMP}/kernel_layout.py"
+          git log -1 --format='checked out: %H %s' HEAD
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install SDK packages
+        # 元のビルド (android.yml) と同じ手順
+        run: |
+          SDKMANAGER="$(ls -d "${ANDROID_HOME}"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)"
+          yes | "${SDKMANAGER}" --licenses > /dev/null || true
+          "${SDKMANAGER}" --install "platforms;android-35" "build-tools;35.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Download the APK used on the devices
+        uses: actions/download-artifact@v4
+        with:
+          name: MobileBench-debug-apk
+          run-id: ${{ matrix.run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/original
+
+      - name: Compare and write the kernel layout
+        run: |
+          ls -la "${RUNNER_TEMP}/original"
+          original="$(ls "${RUNNER_TEMP}"/original/*.apk)"
+          sha256sum "$original" android/app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p out
+          python3 -I "${RUNNER_TEMP}/kernel_layout.py" \
+            --search-dir android/app/build/intermediates \
+            --apk android/app/build/outputs/apk/debug/app-debug.apk \
+            --compare-apk "$original" \
+            --compare-label "実機で使った APK (Android の実行 ${{ matrix.run_id }} = build ${{ matrix.build }})" \
+            --tools-dir "${ANDROID_HOME}/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" \
+            --label "${{ matrix.version }} build ${{ matrix.build }} を CI でビルドし直したもの (コミット ${{ matrix.sha }})" \
+            --allow-mismatch \
+            --out "out/build${{ matrix.build }}.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-layout-build${{ matrix.build }}
+          path: out/build${{ matrix.build }}.txt
+          if-no-files-found: error
+          retention-days: 90
+
+  summary:
+    name: Summary
+    needs: rebuild
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: kernel-layout-build*
+          merge-multiple: true
+          path: layouts
+
+      - name: Combine
+        run: |
+          {
+            echo "# カーネルの位置: build 12 と build 15 (CI でビルドし直したものと、実機で使った APK の比較)"
+            echo
+            echo "workflow run ${GITHUB_RUN_ID} (attempt ${GITHUB_RUN_ATTEMPT}) / commit ${GITHUB_SHA}"
+            echo
+            for f in layouts/build12.txt layouts/build15.txt; do cat "$f"; echo; done
+          } > kernel-layout-build12-build15.txt
+          grep -E '^(# |使った|APK の|実機で使った|  ->|  カーネルの関数の動的|    addr|mb::|  addr|NG)' kernel-layout-build12-build15.txt || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-layout-build12-build15
+          path: kernel-layout-build12-build15.txt
+          if-no-files-found: error
+          retention-days: 90

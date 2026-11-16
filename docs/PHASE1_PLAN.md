@@ -7,6 +7,7 @@
 - 位置づけ: `docs/DESIGN.md` §8 フェーズ 1 の作業を、PR 単位の手順にしたもの。実装は別のセッションが行う。各 PR に渡すプロンプトは P4 にある。
 - 本書の作成では、リポジトリのコードを変更していない。P3.21 の試作は作業用の場所で行い、リポジトリには入れていない。
 - 計画と違う実装にした点は、その PR の説明に書き、本書の P7 に 1 行足す。
+- 改訂(2026-11-16、PR #5 の中で): 計測スレッドの優先度の設定を core に寄せる変更を、PR-B から PR-D に移した(J2 の「確かめたこと」)。`spread_and_stability_are_computed` の修正を PR-A に足した(P4.1 の作業 8)。
 
 主張の確からしさは、`docs/DESIGN.md` §0 と同じ印(【コード】【実行】【実機】【資料】【推測】)で示す。本書の【実行】は、2026-11-16 にこの計画の作成で確かめたものを指す(出典は付録)。
 
@@ -38,8 +39,9 @@
 **J2. 0.2.2 を挟むことと、`schema_version` の番号**
 
 - 推奨: PR-B を 0.2.2(PATCH)とし、`schema_version` を 7 にする。固定時間方式(PR-D)は 8 にする。§5.2 の「固定時間方式への移行で 7」は、PR-B で書き改める。
-- 理由: 前面を離れたら無効にすることと、優先度の設定を core に寄せることは、フェーズ 0 の残りである(§8)。クロックの候補の比較とタッチの記録は、計測区間と手順を変えない(§5.3 の PATCH)。PR-D の前に入れると、(1) アプリ側の変更だけを実機で確かめられる、(2) V22 の候補のデータを早く取れる、(3) PR-D が小さくなる。JSON の形が変わるので、`schema_version` は上げる(`CLAUDE.md` の制約)。
+- 理由: 前面を離れたら無効にすることは、フェーズ 0 の残りである(§8)。クロックの候補の比較とタッチの記録は、計測区間と手順を変えない(§5.3 の PATCH)。PR-D の前に入れると、(1) アプリ側の変更だけを実機で確かめられる、(2) V22 の候補のデータを早く取れる、(3) PR-D が小さくなる。JSON の形が変わるので、`schema_version` は上げる(`CLAUDE.md` の制約)。
 - ほかの案: これらを PR-D に含め、7 を 1 回で済ませる(PR-D がさらに大きくなる)。
+- 確かめたこと(優先度の設定を core に寄せる変更。2026-11-16、PR #4 の `5385406` のコードで): Android は変わらない。`platform::configure_benchmark_thread()` の中身は `#if defined(__APPLE__)` の中だけで(`platform.cpp:91-95`)、Android では何もしない。呼び出しスレッドは今と同じ Kotlin の `Dispatchers.Default` のスレッド(`BenchmarkViewModel.kt:60`)のままで、Kotlin 側に優先度を設定するコードはない【コード】。iOS は、今は Swift が `Thread.qualityOfService = .userInitiated` を設定し(`BenchmarkViewModel.swift:71`)、変更後は core が `pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0)` を呼ぶ(`platform.cpp:93`)。クラスは同じだが、2 つの API が同じ QoS(相対優先度を含む)とスレッドの優先度になることは、このリポジトリのコードからは確かめられない【推測】。変わらないと言い切れないので、この変更は PR-B(0.2.2)に入れず、MINOR を上げる PR-D(0.3.0)に移す。iOS の実機の計測はまだないので、0.2.x のスコアへの影響はない。
 
 **J3. §5.2 の項目のうち、フェーズ 1 の JSON に入れる範囲**
 
@@ -165,9 +167,9 @@
 | PR | 内容 | `benchmark_version` | `schema_version` | マージ後の実機 |
 |---|---|---|---|---|
 | A | CI の検査を足す(Xcode の固定、3 か所の版の一致、JNI、パーサ、要約の解析、カーネルの位置) | 変えない(0.2.1) | 変えない(6) | 不要 |
-| B | フェーズ 0 の残り(前面を離れたら無効、優先度の設定)、タッチの記録、クロックの候補 (a)(b) | **0.2.2** | **7** | 要(2 台。P5.1) |
+| B | フェーズ 0 の残り(前面を離れたら無効)、タッチの記録、クロックの候補 (a)(b) | **0.2.2** | **7** | 要(2 台。P5.1) |
 | C | 固定時間方式の計測の部品と、そのユニットテスト。スコア対象の手順からは、まだ使わない | 変えない(0.2.2) | 変えない(7) | 不要 |
-| D | 切り替え。固定時間方式、単位、§5.5 の手順、JSON、要約、パーサ、UI、診断モード、README | **0.3.0** | **8** | 要(2 台。P5.2) |
+| D | 切り替え。固定時間方式、単位、§5.5 の手順、計測スレッドの優先度の設定を core に寄せる、JSON、要約、パーサ、UI、診断モード、README | **0.3.0** | **8** | 要(2 台。P5.2) |
 | R | 実機の結果の記録(B の後と D の後に、それぞれ 1 本以上) | 変えない | 変えない | — |
 
 ### P1.2 順序
@@ -209,7 +211,7 @@
 | §1.8 (1) | 片ごとの最大時間を、診断モードに出す | D |
 | §8、§1.4 | README の更新 | B(一部)、D |
 | §4-Q7 の 3、§1.5-4、§8 フェーズ 0 | 計測中に前面を離れたら無効にする(V14 の前に要る) | B |
-| §4-Q3、§1.5-5、§8 フェーズ 0 | 計測スレッドの優先度設定を core に寄せる | B |
+| §4-Q3、§1.5-5、§8 フェーズ 0 | 計測スレッドの優先度設定を core に寄せる | D(J2 の「確かめたこと」) |
 | §4-Q9、§1.5-2、§6 C6 | Xcode の版の固定 | A |
 | §4-Q9、§1.5-9 | 3 か所のバージョンの一致の検査 | A |
 | §6 C8、§8 フェーズ 0 | カーネルの関数のアドレスと逆アセンブルを CI で出す | A |
@@ -246,7 +248,7 @@
 | 3 か所のバージョンの一致の検査 | **PR-A(フェーズ 1 の前)** | PR-B と PR-D が版を上げる。上げ忘れを CI で止める |
 | `ios.yml` で Xcode の版を固定する | **PR-A(フェーズ 1 の前)** | フェーズ 1 の間にランナーの既定が変わると、core の変更と区別できない失敗が出る |
 | C8(カーネルの関数のアドレスと逆アセンブル) | **PR-A(フェーズ 1 の前)** | フェーズ 1 は core のコードを大きく変える。ビルドごとにカーネルの位置が動きうる(§1.8 (4))。0.2.2 と 0.3.0 のビルドから、位置の記録を残す |
-| 計測スレッドの優先度設定を core に寄せる | **PR-B(フェーズ 1 の前)** | `Runner::run` の入口を PR-D が書き直す。先に済ませる |
+| 計測スレッドの優先度設定を core に寄せる | **PR-D(フェーズ 1 の中)** | iOS の計測スレッドの QoS が今と同じになるとは、コードから確かめられない(J2)。版を上げる PR-D に入れる |
 | iOS にフラグの検査を足す | フェーズ 2 の最初 | フェーズ 1 はフラグを変えない。コード生成を扱うフェーズ 2 の前に要る |
 | iOS の機種情報を補う | 「保留: iOS 実機」の再開時 | iOS の実機の結果を受け取るまで使わない |
 | V23(貼り付けが切れる場所) | 手の空いたとき | 要約の分割で実害はなくなっている(§1.8 (5)) |
@@ -666,11 +668,11 @@ struct Progress {
 - 開始のタッチは入らない(指が触れた時点では、まだ計測が始まっていない)。「中止」ボタンへのタッチは入る。
 - アプリの外へのタッチ(通知の領域など)は記録できない(J6)。
 
-### P3.12 計測スレッドの設定(PR-B)
+### P3.12 計測スレッドの設定(PR-D)
 
 - `Runner::run`(`run_impl` の入口)で、呼び出しスレッドに `platform::configure_benchmark_thread()` を呼ぶ(§4-Q3)。iOS では QoS を `USER_INITIATED` にする。Android と Linux では何もしない(現行どおり)。
 - Swift 側の `thread.qualityOfService = .userInitiated`(`BenchmarkViewModel.swift:71`)は消す。設定の場所を core の 1 か所にする。
-- 計測には影響しない(iOS は今も同じ QoS で動いている。Android は変わらない)。
+- Android は変わらない。iOS は、QoS のクラスは同じ `USER_INITIATED` だが、設定する API が変わる。相対優先度を含めて同じになるかは確かめられないので、版を上げる PR-D に入れる(J2)。
 
 ### P3.13 診断モード
 
@@ -936,18 +938,25 @@ P3.2 の数え方を、決めた時刻の列に当てて、「計測したスル
 7. **カーネルの位置**(C8、J9):
    - `android.yml` で、arm64-v8a の `libmobilebench_jni.so`(シンボルの残っているもの)から、カーネルの関数(名前に `count_primes_segmented`、`matmul_blocked` を含むもの。名前の一覧はスクリプトの冒頭に置き、後の PR が足せるようにする)について、アドレス、大きさ、アドレスを 64 で割った余り、関数の中の後ろ向きの分岐(ループ)の飛び先のアドレスと 64 で割った余り、逆アセンブルを、テキストに出す。APK に入る `.so` と `.text` の内容が同じことも確かめる。成果物(`kernel-layout`)として上げ、要点をログにも出す。道具は NDK の `llvm-nm`、`llvm-objdump`、`llvm-readelf` を使う。スクリプトは `.github/scripts/kernel_layout.py` に置く。
    - 一度だけの比較(J9): 新しいワークフロー `kernel-layout.yml`(手動の実行と、自身の変更の push で動く)で、コミット `8145938` と `7dcf4a1` をビルドし直す。実機で使った APK(Android のワークフローの実行 `42952127373` = build 12、`43670028049` = build 15 の成果物 `MobileBench-debug-apk`)の `.so` と、`.text` を比べる。一致したかどうかと、両方のカーネルの位置を出す。結果のテキストを `docs/measurements/<作業日>-kernel-layout/` に保存し、`docs/measurements/README.md` の一覧に足す。原因の判断はしない。事実だけを書く。
+8. **時間のゆらぎで落ちうるユニットテストの修正**: `core/tests/test_runner.cpp` の `spread_and_stability_are_computed` は、実行するマシンの時間のゆらぎで落ちうる。PR #4 で `full_procedure_runs_peak_then_sustained` を直したのと同じ理由である(コミット `5385406`)。
+   - 今のテストは、実時間で 3 ms 待つ偽のテストを測り、`spread < 0.06`、`stable`、`attempts == 1` を確かめている。ばらつきが 6% を超えると、不安定と判定されて測り直しになり、3 つとも落ちる。ピーク段階の回復の確認も、マシンの状態で結果が変わる。
+   - 直し方: テストの中で `cfg.policy` に指定する値だけを変える。`recovered_ratio = 0.0`(1 回目の確認で必ず回復)と、`stable_spread = 1e9`(必ず安定。測り直しが起きない)にする。そのうえで、値の範囲ではなく式を確かめる。`spread` が `runs_ns` から求めた(最大 − 最小)÷ 中央値と一致すること、`stable` が真、`attempts` が 1 であること。
+   - **`RunPolicy` の既定値(`runner.h`)、`fast_policy()` の中身、計測の手順で使う値は変えない。** 変えるのは、このテストの中で設定する値だけである。
+   - 同じファイルのほかのテストは変えない。PR-D でこのテストを書き直すときも、同じ考え方にする(P2.4)。
 
 **変更するファイル**
 
 - `.github/workflows/ios.yml`、`android.yml`、`core-test.yml`、(新規)`kernel-layout.yml`
 - (新規)`.github/scripts/check_versions.py`、`check_jni.py`、`kernel_layout.py`、`swift_parse_check/main.swift`
 - `android/app/build.gradle.kts`(テスト用の依存)、(新規)`android/app/src/test/java/com/mobilebench/app/bench/BenchmarkResultParseTest.kt`
+- `core/tests/test_runner.cpp`(作業 8。このテストの中で指定する値だけ)
 - `docs/measurements/tools/analyze_summary.py`、`docs/measurements/README.md`、(新規)`docs/measurements/<作業日>-kernel-layout/`
 - `README.md`(GitHub Actions の表)、`docs/DESIGN.md`(§8 フェーズ 0 の該当する行に実装した旨、§6 の C6 と C8 の結果)、`CLAUDE.md`(「ビルドとテスト」に、CI の検査を 1〜2 行)
 
 **確かめ方**
 
 - 足したスクリプトを手元で実行する。わざと食い違わせて、失敗することも確かめる(確かめたら戻す)。
+- 作業 8 のあと、手元の `ctest` を通す。`./build/mobilebench_tests spread_and_stability` を 20 回続けて実行し、1 回も落ちないことを確かめる。
 - 3 つのワークフローが成功する。`kernel-layout.yml` が最後まで動き、結果が出る。
 
 **マージ後の実機**: 不要。
@@ -960,7 +969,7 @@ docs/PHASE1_PLAN.md の PR-A(CI の検査を足す)を実装してください�
 
 ■ 最初に読むもの
 1. CLAUDE.md(全部)
-2. docs/PHASE1_PLAN.md の P0.1 の J7〜J9、P1.5、P2(全部)、P3.16、P3.20、P4.1
+2. docs/PHASE1_PLAN.md の P0.1 の J7〜J9、P1.5、P2(全部。特に P2.4)、P3.16、P3.20、P4.1
 3. docs/DESIGN.md の §1.5 の 2・3・9、§1.8 (4)、§4-Q9 の「CI の修正」、§6 の C6 と C8
 
 ■ 前提
@@ -968,17 +977,24 @@ main に、PR #4(docs/DESIGN.md に §1.8 がある)と docs/PHASE1_PLAN.md が�
 入っていなければ、作業を始めずに報告してください。
 
 ■ やること
-docs/PHASE1_PLAN.md P4.1 の「作業」の 1〜7 です。
+docs/PHASE1_PLAN.md P4.1 の「作業」の 1〜8 です。
 CI とテストの検査を足すだけで、アプリと core の動作は変えません。
+作業 8 では、core/tests/test_runner.cpp の spread_and_stability_are_computed を、マシンの時間のゆらぎで落ちない形に直します。
+- 変えるのは、このテストの中で指定する値(cfg.policy.recovered_ratio と cfg.policy.stable_spread)と、確かめる内容だけです。
+- RunPolicy の既定値(core/include/mobilebench/runner.h)、fast_policy() の中身など、計測の手順で使う値は変えないでください。
+- PR #4 のコミット 5385406 で full_procedure_runs_peak_then_sustained を直したやり方に合わせてください。
 
 ■ やらないこと
 - core/src と core/include の変更(計測区間、手順、JSON、要約の書式を変えない)
+- core/tests の、作業 8 のテスト以外の変更
 - benchmark_version と schema_version の変更
 - .github/workflows/android.yml のファイル名の変更
 - iOS のフラグの検査(フェーズ 2 で行う)
 
 ■ 確かめ方
 - 足したスクリプトは手元で実行し、わざと食い違わせた場合に失敗することも確かめてください(確かめたら戻す)。
+- 作業 8 のあと、cmake でビルドして ctest を通し、./build/mobilebench_tests spread_and_stability を 20 回続けて実行して、
+  1 回も落ちないことを確かめてください。
 - push の後、Core tests、Android、iOS の 3 つのワークフローが成功することを確かめてください。
 - 作業 7 の kernel-layout のワークフローは、結果のテキストを確かめて、docs/measurements/ に保存してください。
   原因の判断は書かず、一致したかどうかと位置の事実だけを書いてください。
@@ -1004,12 +1020,12 @@ docs/PHASE1_PLAN.md P2.7 に従ってください。外から見える点で決�
 **作業**
 
 1. **core**
-   - `Runner::interrupt`(P3.10)、`Runner::note_touch`(P3.11)、呼び出しスレッドの設定(P3.12)。
+   - `Runner::interrupt`(P3.10)、`Runner::note_touch`(P3.11)。呼び出しスレッドの設定(P3.12)は PR-D で行う。
    - 診断モードのクロックの比較を、候補 (a)(b) に入れ替える(P3.13 (1))。`busy_spin_counted` を消し、共通の時刻まで負荷をかける関数を足す。
    - JSON を schema 7 にする(P3.14)。要約に P3.15 の「PR-B で足すもの」を足す。
    - 版を 0.2.2 にする(P3.20)。
 2. **Android**: JNI の関数を 2 つ足す(中断、タッチ)。`NativeBench`、`BenchmarkViewModel`、`MainActivity`(`onStop`、`dispatchTouchEvent`)、パーサ(`interrupted`、`interruption`)、無効の理由の表示(P3.17)、`versionName`。PR-A のパーサのテストに、足したキーの検査を足す。
-3. **iOS**: ブリッジにメソッドを 2 つ足す。ViewModel(バックグラウンドの通知、QoS の指定を消す)、タッチを見る部品、パーサ(足すキーは省略可能にする)、無効の理由の表示、`MARKETING_VERSION`。
+3. **iOS**: ブリッジにメソッドを 2 つ足す。ViewModel(バックグラウンドの通知。QoS の指定はそのまま残す)、タッチを見る部品、パーサ(足すキーは省略可能にする)、無効の理由の表示、`MARKETING_VERSION`。
 4. **`analyze_summary.py`**(P3.16 の PR-B の分)。
 5. **ユニットテスト**
    - 中断: 進捗の通知の中から `interrupt("left_foreground")` を呼ぶ。`interrupted` が真、`valid` が偽、`cancelled` が偽、要約に `INTERRUPTED(left_foreground)`、JSON に `"interrupted":true`。
@@ -1045,7 +1061,7 @@ docs/PHASE1_PLAN.md の PR-B(0.2.2)を実装してください。
 ■ 最初に読むもの
 1. CLAUDE.md(全部)
 2. docs/PHASE1_PLAN.md の P0.1 の J2・J6・J12、P1.3〜P1.5、P2(全部)、P3.10〜P3.17、P3.20、P4.2、P5.1
-3. docs/DESIGN.md の §1.5 の 4・5、§1.8 (2)(3)、§4-Q3、§4-Q7 の 2・3、§5.2、§5.3、§5.5 の
+3. docs/DESIGN.md の §1.5 の 4、§1.8 (2)(3)、§4-Q7 の 2・3、§5.2、§5.3、§5.5 の
    「状態を確かめるクロックの求め方」と「記録と表示」、§6 の V22、§8 のフェーズ 0
 
 ■ 前提
@@ -1056,13 +1072,14 @@ main に、docs/PHASE1_PLAN.md の PR-A(.github/scripts/check_versions.py など
 docs/PHASE1_PLAN.md P4.2 の「作業」の 1〜6 です。要点は次のとおりです。
 - 計測中にアプリが前面を離れたら、計測を中止して無効にする(core、Android、iOS)
 - 計測中の画面へのタッチを記録する(判定には使わない)
-- 呼び出しスレッドの優先度の設定を、core の Runner::run の入口に寄せる
 - 診断モードのクロックの比較を、候補 (a)(b) に入れ替える(判定には使わない)
 - benchmark_version を 0.2.2、schema_version を 7 にする
 
 ■ やらないこと
 - 計測区間、処理単位、ピークと持続の手順、判定の値、基準値、コンパイルフラグの変更
 - 固定時間方式に関わる変更(PR-C と PR-D で行う)
+- 計測スレッドの優先度の設定の変更(Swift の thread.qualityOfService を消すこと、Runner::run の入口で設定すること)。
+  iOS の QoS が今と変わる可能性があるため、PR-D(0.3.0)で行う(docs/PHASE1_PLAN.md J2)
 - docs/PHASE1_PLAN.md P1.4 の項目(警告の表示など)
 - iOS の署名や実機向けの作業
 
@@ -1182,6 +1199,7 @@ docs/PHASE1_PLAN.md P2.7 に従ってください。計画と違う実装にし�
    - `registry.cpp`: 単位と窓(P3.1)。16 単位の定数と、その説明のコメントを消す(D9)。`category` を替える(J3)。
    - `TimedUnitTest` を `BenchmarkTest` の実装にする。`unit_based_test.h` と、現行の `UnitKernel`、`SieveKernel`、`MatmulKernel` を消す。診断モードの `matmul128` のために、今の `MatmulKernel::run_unit` と同じ処理を、`TimedKernel` の形で残す(P3.13 (2))。
    - `reference_times.h` の形式を替える(値は、作業 8 で入れる)。
+   - 呼び出しスレッドの設定(P3.12)。`Runner::run` の入口で `platform::configure_benchmark_thread()` を呼ぶ。
 2. **診断モード**(P3.13 (2)(3))。
 3. **JSON、要約、`analyze_summary.py`**(P3.14 の schema 8、P3.15 の PR-D の書式、P3.16)。
 4. **ユニットテスト**
@@ -1193,7 +1211,7 @@ docs/PHASE1_PLAN.md P2.7 に従ってください。計画と違う実装にし�
    - 診断モード: クラスタ別(`matmul576p`、`max_ms_per_unit`)、行列サイズ掃引、ステップ数。
 5. **CLI と ctest**(P3.18)。
 6. **Android**: JNI の進捗のシグネチャ(P3.7)、`NativeBench.kt`、ViewModel、パーサ、画面と文言(P3.17)、パーサのテスト、`versionName`。
-7. **iOS**: ブリッジの進捗の型、ViewModel、パーサ、画面と文言、`MARKETING_VERSION`。
+7. **iOS**: ブリッジの進捗の型、ViewModel(`thread.qualityOfService = .userInitiated` を消す。P3.12)、パーサ、画面と文言、`MARKETING_VERSION`。
 8. **暫定の基準値と版**(P3.19、P3.20)。
 9. **文書**
    - `README.md`: 計測ルール、テストの表、2 段階の計測の説明、JSON の例、計測の内訳、診断モード、テストの追加方法、基準時間の差し替え方。拡張予定の表は、§4-Q4 と §8 に合わせる。「モバイルは両 OS とも clang 系なので条件は揃っています」は、未検証であることが分かる書き方に直す(§1.4)。
@@ -1229,7 +1247,7 @@ docs/PHASE1_PLAN.md の PR-D(0.3.0。固定時間方式への切り替え)を実
 ■ 最初に読むもの
 1. CLAUDE.md(全部)
 2. docs/PHASE1_PLAN.md の P0(全部)、P1.3、P1.4、P2(全部)、P3(全部)、P4.4、P5.2、P6
-3. docs/DESIGN.md の D1、D2、D3、D9、§4-Q5、§4-Q7、§5.1、§5.2、§5.3、§5.5、§5.6、§8 のフェーズ 1
+3. docs/DESIGN.md の D1、D2、D3、D9、§1.5 の 5、§4-Q3、§4-Q5、§4-Q7、§5.1、§5.2、§5.3、§5.5、§5.6、§8 のフェーズ 1
 4. core の現行の実装(src/runner.cpp、src/tests/timed_*、src/diagnostics.cpp、src/summary.cpp、
    src/result_json.cpp、tests/)と、android/、ios/ のブリッジ、パーサ、画面
 
@@ -1246,6 +1264,7 @@ docs/PHASE1_PLAN.md P4.4 の「作業」の 1〜9 です。要点は次のとお
 - 確認ごとの値、採用しなかった回、回ごとのタッチの数を記録する
 - JSON を schema 8 にし、要約の書式、analyze_summary.py、Kotlin と Swift のパーサ、画面を合わせる
 - 診断モードを新しい方式に合わせる
+- 計測スレッドの優先度の設定を、core の Runner::run の入口に寄せる(iOS の Swift 側の QoS の指定は消す)
 - benchmark_version を 0.3.0 にする。基準値は、開発環境で測った暫定値を入れる
 - README、docs/DESIGN.md、CLAUDE.md を直す
 

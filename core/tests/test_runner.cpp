@@ -385,6 +385,11 @@ RunPolicy fast_policy() {
 TEST(full_procedure_runs_peak_then_sustained) {
   RunConfig cfg;
   cfg.policy = fast_policy();
+  // このテストは段階の流れ (peak -> sustained) を確かめる。回復と安定の判定は、実行するマシンの
+  // 時間のゆらぎで結果が変わるので、ここでは必ず通る値にする (判定そのものは別のテストで確かめる)。
+  // テストの中だけの値で、RunPolicy の既定値 (計測の手順) は変えていない
+  cfg.policy.recovered_ratio = 0.0;  // 推定値は 0 以上なので、1 回目の確認で必ず「回復した」になる
+  cfg.policy.stable_spread = 1e9;    // ばらつきによらず「安定」になり、測り直しが起きない
   cfg.threads = 2;
   Runner runner(cfg);
   std::vector<std::string> phases_seen;
@@ -405,8 +410,10 @@ TEST(full_procedure_runs_peak_then_sustained) {
   EXPECT_EQ(r.tests[0].phase, std::string("peak"));
   EXPECT_EQ(r.tests[3].phase, std::string("sustained"));
   EXPECT_TRUE(r.valid);
-  // スコアは同じ基準時間で計算されるので、持続率は約 100%
-  EXPECT_NEAR(r.retention, 1.0, 0.1);
+  // 持続率 = 持続のスコア ÷ ピークのスコア。値そのものは実行するマシンの時間のゆらぎで動くので、
+  // 式だけを確かめる
+  EXPECT_TRUE(r.retention > 0.0);
+  EXPECT_NEAR(r.retention, r.phases[1].score / r.phases[0].score, 1e-9);
   EXPECT_NEAR(r.overall_score, r.phases[0].score, 1e-9);
   // peak は回復待ちをする / sustained は事前負荷をする
   EXPECT_TRUE(r.tests[0].wait_ms >= 20);
@@ -426,6 +433,33 @@ TEST(full_procedure_runs_peak_then_sustained) {
   EXPECT_TRUE(json.find("\"sustained\":{\"score\":") != std::string::npos);
   EXPECT_TRUE(json.find("\"phase\":\"sustained\"") != std::string::npos);
   EXPECT_TRUE(r.summary_text.find("[sustained a] median") != std::string::npos);
+}
+
+TEST(peak_wait_stops_at_max_and_records_not_recovered) {
+#if defined(__x86_64__) || defined(__aarch64__)
+  RunConfig cfg;
+  cfg.policy = fast_policy();
+  cfg.policy.sustained_phase = false;
+  // 基準クロックの 1e9 倍には決して届かないので、必ず「回復せず」になる (テストの中だけの値)
+  cfg.policy.recovered_ratio = 1e9;
+  cfg.policy.stable_spread = 1e9;  // 測り直しを起こさない (待ちが 1 回だけになる)
+  cfg.threads = 1;
+  Runner runner(cfg);
+  SuiteResult r = runner.run_with_factory([] {
+    std::vector<TestPtr> v;
+    v.push_back(std::make_unique<SpinTest>("never", std::vector<int>{2000}));
+    return v;
+  });
+  EXPECT_TRUE(r.baseline_ghz > 0.0);
+  EXPECT_EQ(r.tests.size(), 1u);
+  EXPECT_TRUE(!r.tests[0].recovered);
+  // 2 回目以降の確認は check_interval (20 ms) ごと。上限 (100 ms) に達したところで打ち切って測る
+  EXPECT_EQ(r.tests[0].wait_ms, cfg.policy.max_wait_ms);
+  EXPECT_TRUE(r.tests[0].recovery_ghz > 0.0);
+  EXPECT_EQ(r.tests[0].attempts, 1);
+  EXPECT_TRUE(r.tests[0].valid);  // 「回復せず」でも測る
+  EXPECT_TRUE(r.summary_text.find("wait 100ms(NOT recovered)") != std::string::npos);
+#endif
 }
 
 TEST(unstable_test_is_retried_and_flagged) {

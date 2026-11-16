@@ -1,0 +1,90 @@
+MobileBench v0.2.1 | app 0.2.1 build 15 (7dcf4a1) | run 2026-11-15T09:08:42Z | part 1/2
+device: Nothing A063 soc=SM7325 android 15 build=V3.2-260416-1140 | arm64 clang 18.0.3 -O2 -ffp-contract=on
+os build_id=AQ3A.240929.001 incremental=2604161140 security_patch=2026-04-01 fingerprint=Nothing/Spacewar/Spacewar:15/AQ3A.240929.001/2604161140:user/release-keys
+scores peak 789.0(unstable) sustained 795.5 retention 100.8% valid=yes cores=8 diag=yes
+baseline 2.24GHz(all-core) precondition 3000ms -> 2.38GHz settled
+topology max_mhz 1804x4 2400x3 2515 capacity 378x4 957x3 1024
+columns: run time cpu ghz(before>after) cur(after,MHz) [cap(MHz), only if != max_mhz] | ST: unit ms | MT: units/worker busy
+cond(base) battery_level=77 battery_temp_c=28.0 charging=false power_save=false thermal_headroom_10s=0.38 thermal_status=NONE
+cond: only keys that differ from cond(base) ('=' same as base)
+[peak cpu.single.sieve] median 249.6ms score 601.0 threads 1 @2.51G spread 0.1% attempts 1 wait 2000ms rec 2.43G
+  W  250.9ms cpu4,7 ghz 2.40>2.52 cur 691x7 2515 u 63.7 62.4 62.4 62.4
+  #1 249.6ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 62.5 62.4 62.4 62.3
+  #2 249.7ms cpu7 ghz 2.51>2.51 cur 691x7 2515 u 62.5 62.4 62.4 62.4
+  #3 249.6ms cpu7 ghz 2.52>2.51 cur 691x7 2515 u 62.5 62.4 62.4 62.4
+  #4 249.9ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 62.5 62.4 62.4 62.6
+  #5 249.6ms cpu7 ghz 2.52>2.51 cur 691x7 2515 u 62.5 62.4 62.4 62.3
+[peak cpu.single.matmul] median 216.1ms score 832.8 threads 1 @2.52G spread 0.9% attempts 1 wait 2000ms rec 2.29G
+  cond thermal_headroom_10s=0.39 -> thermal_headroom_10s=0.39
+  W  237.0ms cpu5,7 ghz 1.23>2.51 cur 691x7 2515 u 73.2 55.1 54.4 54.3
+  #1 214.9ms cpu7 ghz 2.51>2.51 cur 691x7 2515 u 54.4 53.5 53.6 53.5
+  #2 214.9ms cpu7 ghz 2.51>2.52 cur 691x7 2515 u 54.3 53.5 53.7 53.5
+  #3 216.8ms cpu7 ghz 2.52>2.52 cur 1152x4 1228x3 2515 u 54.7 53.7 54.2 54.1
+  #4 216.2ms cpu7 ghz 2.52>2.52 cur 1152x4 1228x3 2515 u 54.3 54.3 53.7 54.0
+  #5 216.1ms cpu7 ghz 2.52>2.52 cur 1152x4 1228x3 2515 u 54.1 54.2 53.9 53.9
+[peak cpu.multi.sieve] median 212.2ms score 801.2 threads 8 @2.14G spread 7.4% UNSTABLE attempts 3 wait 2000ms rec 2.35G
+  cond thermal_headroom_10s=0.39 -> thermal_headroom_10s=0.39
+  W  213.6ms cpu0-2,4-7 ghz 2.40>2.31(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 190.4-207.9ms
+  #1 209.6ms cpu0-7 ghz 2.12>2.16(1.80-2.40) cur 691x4 2400x3 2515 units 2-2 busy 175.6-209.2ms
+  #2 212.2ms cpu0-7 ghz 2.23>1.29(0.69-1.80) cur 691x4 2400x3 2515 units 2-2 busy 167.0-211.8ms
+  #3 219.2ms cpu0-7 ghz 2.15>1.93(1.80-2.21) cur 691x4 2400x3 2515 units 2-2 busy 172.5-218.8ms
+  #4 213.5ms cpu0-7 ghz 2.06>2.31(1.79-2.51) cur 1804x4 2400x3 2515 units 2-2 busy 185.2-213.2ms
+  #5 203.4ms cpu0-7 ghz 2.29>2.12(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 184.3-202.9ms
+[peak cpu.multi.matmul] median 238.0ms score 966.6 threads 8 @1.95G spread 2.9% attempts 2 wait 2000ms rec 2.19G
+  cond thermal_headroom_10s=0.40 -> thermal_headroom_10s=0.40
+  W  238.3ms cpu2,4-7 ghz 2.40>2.28(1.80-2.51) cur 691x4 2400x3 2515 units 2-2 busy 195.7-237.7ms
+  #1 238.7ms cpu0-7 ghz 2.22>1.90(1.80-2.21) cur 691x4 2400x3 2515 units 2-2 busy 195.8-238.2ms
+  #2 234.6ms cpu0-7 ghz 2.19>2.20(1.80-2.40) cur 691x4 2400x3 2515 units 2-2 busy 195.5-234.5ms
+  #3 238.0ms cpu0-7 ghz 1.57>2.12(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 190.0-237.5ms
+  #4 231.8ms cpu0,2-7 ghz 1.53>2.37(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 189.3-230.4ms
+  #5 238.8ms cpu0-7 ghz 2.42>1.26(0.69-1.80) cur 691x4 940x3 2515 units 2-2 busy 194.2-237.8ms
+[sustained cpu.single.sieve] median 249.6ms score 601.0 threads 1 @2.51G spread 0.1% attempts 1
+  cond thermal_headroom_10s=0.40 -> thermal_headroom_10s=0.40
+  W  251.5ms cpu5,7 ghz 2.40>2.51 cur 691x7 2515 u 64.3 62.4 62.4 62.4
+  #1 249.6ms cpu7 ghz 2.51>2.51 cur 691x7 2515 u 62.5 62.4 62.3 62.3
+  #2 249.7ms cpu7 ghz 2.51>2.52 cur 691x7 2515 u 62.6 62.4 62.4 62.4
+  #3 249.6ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 62.5 62.4 62.4 62.3
+  #4 249.6ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 62.5 62.4 62.4 62.3
+  #5 249.6ms cpu7 ghz 2.51>2.51 cur 691x7 2515 u 62.5 62.4 62.4 62.3
+[sustained cpu.single.matmul] median 215.2ms score 836.6 threads 1 @2.51G spread 0.3% attempts 1
+  cond thermal_headroom_10s=NaN -> thermal_headroom_10s=0.40
+  W  215.2ms cpu7 ghz 2.51>2.52 cur 691x7 2515 u 54.3 53.6 53.8 53.4
+  #1 215.4ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 54.4 53.7 54.1 53.3
+  #2 214.9ms cpu7 ghz 2.51>2.51 cur 691x7 2515 u 54.2 53.5 53.5 53.6
+  #3 215.2ms cpu7 ghz 2.51>2.52 cur 691x7 2515 u 54.3 53.8 53.6 53.5
+  #4 215.2ms cpu7 ghz 2.52>2.52 cur 691x7 2515 u 54.1 53.5 53.9 53.7
+  #5 215.1ms cpu7 ghz 2.51>2.52 cur 691x7 2515 u 54.0 53.8 53.8 53.5
+[sustained cpu.multi.sieve] median 210.1ms score 809.3 threads 8 @2.17G spread 2.0% attempts 3
+  cond thermal_headroom_10s=NaN -> thermal_headroom_10s=0.41
+  W  216.1ms cpu2-7 ghz 2.40>2.28(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 170.6-211.7ms
+  #1 207.4ms cpu0-7 ghz 2.22>2.19(1.80-2.40) cur 691x4 2400x3 2515 units 2-2 busy 169.8-207.0ms
+  #2 211.5ms cpu0-7 ghz 2.15>1.46(1.22-1.80) cur 691x4 2400x3 1324 units 2-2 busy 170.8-211.1ms
+  #3 210.1ms cpu0-2,4-7 ghz 2.31>1.64(1.51-1.80) cur 691x4 2400x3 2515 units 2-2 busy 172.5-209.5ms
+  #4 210.3ms cpu0-1,3-7 ghz 2.04>2.30(1.80-2.40) cur 691x4 2400x3 2515 units 2-2 busy 174.0-210.0ms
+  #5 207.6ms cpu0-7 ghz 2.26>2.37(1.97-2.52) cur 691x4 2400x3 2515 units 2-2 busy 180.0-207.3ms
+[sustained cpu.multi.matmul] median 233.7ms score 984.0 threads 8 @2.21G spread 5.8% attempts 1
+  cond thermal_headroom_10s=NaN -> thermal_headroom_10s=0.41
+  W  241.1ms cpu0,2,4-7 ghz 1.90>2.28(1.80-2.52) cur 691x4 2400x3 1516 units 2-2 busy 216.5-234.9ms
+  #1 232.0ms cpu0-7 ghz 1.57>2.35(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 199.5-228.8ms
+  #2 233.7ms cpu0-7 ghz 2.18>2.33(1.80-2.52) cur 691x4 2400x3 2515 units 2-2 busy 194.5-232.9ms
+  #3 229.8ms cpu0-7 ghz 2.22>1.60(1.33-1.80) cur 691x4 2400x3 2515 units 2-2 busy 191.7-229.5ms
+  #4 243.4ms cpu0-7 ghz 2.12>2.31(1.80-2.40) cur 691x4 2400x3 2515 units 2-2 busy 199.0-242.6ms
+  #5 237.5ms cpu1-2,4-7 ghz 2.35>2.37(1.80-2.52) cur 691x4 1228x3 2515 units 2-2 busy 169.9-237.3ms
+[diagnostics] cond thermal_headroom_10s=NaN -> battery_temp_c=29.0 thermal_headroom_10s=0.42
+  boost idle 1000ms (t_ms:GHz unit_ms cpu) 0:2.51G u64.7 cpu2,6-7 | 250:2.51G u62.4 cpu7 | 500:2.51G u62.4 cpu7 | 750:2.51G u62.4 cpu7 | 1000:2.51G u62.4 cpu7 | 1250:2.51G u62.4 cpu7 | 1500:2.51G u62.4 cpu7 | 1750:2.51G u62.4 cpu7
+  boost idle 4000ms (t_ms:GHz unit_ms cpu) 0:2.51G u64.2 cpu0,6-7 | 250:2.51G u62.3 cpu7 | 500:2.51G u62.4 cpu7 | 750:2.51G u62.4 cpu7 | 1000:2.51G u62.4 cpu7 | 1250:2.51G u62.4 cpu7 | 1500:2.51G u62.4 cpu7 | 1750:2.51G u62.4 cpu7
+  probe rest 2000ms load 100ms workers 8 | current = mean of per-worker estimate after load, counted = adds in 50-100ms / time (GHz, per-worker min-max)
+    2016ms current 2.300 (1.80-2.40) counted 1.537 (1.04-1.81)
+    4150ms current 2.279 (1.80-2.52) counted 1.789 (1.59-2.02)
+    6288ms current 2.241 (1.80-2.52) counted 1.602 (1.04-2.06)
+    8422ms current 2.279 (1.80-2.52) counted 1.694 (1.15-2.08)
+    10552ms current 2.220 (1.80-2.52) counted 1.812 (1.48-2.18)
+    12688ms current 2.429 (2.40-2.52) counted 1.796 (1.49-2.18)
+    14822ms current 2.340 (1.80-2.52) counted 1.906 (1.41-2.26)
+    16955ms current 2.217 (1.80-2.51) counted 1.638 (1.27-2.01)
+    19086ms current 2.294 (1.80-2.52) counted 1.683 (1.09-2.12)
+    21218ms current 2.205 (1.80-2.52) counted 1.890 (1.40-2.37)
+    23359ms current 2.204 (1.80-2.52) counted 1.925 (1.72-2.19)
+    25504ms current 2.116 (1.80-2.52) counted 1.685 (1.50-1.87)
+  probe 12 samples: current mean 2.260 range 13.8% | counted mean 1.746 range 22.2% (range = (max-min)/mean)
+END part 1/2 chars=7759

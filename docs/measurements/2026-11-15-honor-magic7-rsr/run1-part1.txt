@@ -1,0 +1,76 @@
+MobileBench v0.2.1 | app 0.2.1 build 15 (7dcf4a1) | run 2026-11-15T07:12:36Z | part 1/2
+device: HONOR PTP-AN20 soc=SM8750 android 17 build=PTP-AN20 11.0.0.117(SP2C00E117R102P1) | arm64 clang 18.0.3 -O2 -ffp-contract=on
+os build_id=HONORPTP-AN20 incremental=11DLDLD117SP2C00E117 security_patch=2026-10-01 fingerprint=HONOR/PTP-AN20/HNPTP:17/HONORPTP-AN20/11DLDLD117SP2C00E117:user/release-keys
+scores peak 862.7 sustained 857.8 retention 99.4% valid=yes cores=8 diag=yes
+baseline 3.50GHz(all-core) precondition 3000ms -> 2.40GHz settled
+topology max_mhz 3532x6 4320x2 capacity 792x6 1024x2
+columns: run time cpu ghz(before>after) cur(after,MHz) [cap(MHz), only if != max_mhz] | ST: unit ms | MT: units/worker busy
+cond(base) battery_level=81 battery_temp_c=26.0 charging=false power_save=false thermal_headroom_10s=0.42 thermal_status=NONE
+cond: only keys that differ from cond(base) ('=' same as base)
+[peak cpu.single.sieve] median 195.3ms score 767.9 threads 1 @2.40G spread 0.1% attempts 1 wait 62000ms(NOT recovered) rec 2.40G
+  W  195.3ms cpu4 ghz 2.39>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 48.9 48.8 48.8 48.8
+  #1 195.3ms cpu4 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 48.8 48.8 48.9 48.8
+  #2 195.4ms cpu4 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 48.8 49.0 48.8 48.8
+  #3 195.3ms cpu4 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 48.8 48.9 48.8 48.8
+  #4 195.3ms cpu4 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 48.9 48.8 48.8 48.8
+  #5 195.5ms cpu4 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.0 48.9 48.8 48.8
+[peak cpu.single.matmul] median 288.4ms score 624.1 threads 1 @2.40G spread 0.2% attempts 1 wait 62000ms(NOT recovered) rec 2.40G
+  cond battery_level=80 thermal_headroom_10s=0.40 -> battery_level=80 thermal_headroom_10s=0.40
+  W  289.9ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 73.1 72.5 72.1 72.1
+  #1 288.6ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.5 72.1 72.1 71.9
+  #2 288.4ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.3 72.2 72.1 71.9
+  #3 288.3ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.3 72.0 72.0 72.1
+  #4 288.5ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.3 72.1 72.0 72.1
+  #5 288.0ms cpu3 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.3 72.0 71.8 71.9
+[peak cpu.multi.sieve] median 151.1ms score 1125.0 threads 8 @2.40G spread 2.2% attempts 1 wait 62000ms(NOT recovered) rec 2.40G
+  cond battery_level=80 thermal_headroom_10s=0.39 -> battery_level=80 thermal_headroom_10s=0.39
+  W  157.2ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 105.4-157.1ms
+  #1 152.6ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 100.2-152.6ms
+  #2 150.0ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 101.0-147.3ms
+  #3 151.1ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 101.1-151.1ms
+  #4 152.3ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 100.0-152.2ms
+  #5 149.2ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 99.7-149.2ms
+[peak cpu.multi.matmul] median 223.9ms score 1027.4 threads 8 @2.40G spread 1.0% attempts 1 wait 62000ms(NOT recovered) rec 2.40G
+  cond battery_level=80 thermal_headroom_10s=0.39 -> battery_level=80 thermal_headroom_10s=0.39
+  W  230.6ms cpu0-5 ghz 2.23>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 151.4-230.5ms
+  #1 222.6ms cpu0-5 ghz 2.39>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 2-2 busy 151.1-222.5ms
+  #2 224.4ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 147.3-224.3ms
+  #3 223.9ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 149.6-220.7ms
+  #4 224.5ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 150.0-224.3ms
+  #5 222.1ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 149.0-219.8ms
+[sustained cpu.single.sieve] median 197.3ms score 760.1 threads 1 @2.40G spread 0.8% attempts 1
+  cond battery_level=80 thermal_headroom_10s=0.38 -> battery_level=80 thermal_headroom_10s=0.38
+  W  197.1ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.6 49.4 49.3 48.8
+  #1 196.7ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.6 49.3 49.0 48.8
+  #2 197.3ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 50.3 49.0 49.3 48.8
+  #3 198.1ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.7 49.4 48.7 50.3
+  #4 196.5ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.4 49.5 48.8 48.8
+  #5 197.5ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 49.5 49.0 50.1 49.0
+[sustained cpu.single.matmul] median 291.0ms score 618.5 threads 1 @2.40G spread 1.5% attempts 1
+  cond battery_level=80 thermal_headroom_10s=0.38 -> battery_level=80 thermal_headroom_10s=0.38
+  W  292.4ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 74.3 72.9 72.2 73.0
+  #1 290.5ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 73.3 72.5 72.8 71.9
+  #2 290.4ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 73.5 72.7 72.4 71.8
+  #3 291.0ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 72.9 73.7 72.7 71.8
+  #4 292.1ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 73.1 72.8 73.8 72.4
+  #5 294.7ms cpu0 ghz 2.40>2.40 cur 2400x6 1017x2 cap 2400x6 1958x2 u 73.0 76.5 72.5 72.7
+[sustained cpu.multi.sieve] median 150.8ms score 1127.0 threads 8 @2.40G spread 2.4% attempts 1
+  cond battery_level=80 thermal_headroom_10s=0.38 -> battery_level=80 thermal_headroom_10s=0.38
+  W  156.7ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 2-2 busy 107.1-156.7ms
+  #1 151.8ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 100.7-151.3ms
+  #2 149.1ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 92.9-148.7ms
+  #3 149.8ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 100.8-149.7ms
+  #4 150.8ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 104.5-150.8ms
+  #5 152.8ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 100.8-152.7ms
+[sustained cpu.multi.matmul] median 225.0ms score 1022.2 threads 8 @2.40G spread 3.4% attempts 1
+  cond battery_level=80 thermal_headroom_10s=0.38 -> battery_level=80 thermal_headroom_10s=0.38
+  W  223.5ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 150.3-223.4ms
+  #1 225.0ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 2-2 busy 151.6-224.8ms
+  #2 222.7ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 150.1-222.0ms
+  #3 226.6ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 153.1-226.6ms
+  #4 224.5ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 147.3-224.4ms
+  #5 230.3ms cpu0-5 ghz 2.40>2.40(2.40-2.40) cur 2400x6 1017x2 cap 2400x6 1958x2 units 1-3 busy 150.3-230.3ms
+[diagnostics] cond battery_level=80 thermal_headroom_10s=0.38 -> battery_level=80 battery_temp_c=25.0 thermal_headroom_10s=0.39
+  boost idle 1000ms (t_ms:GHz unit_ms cpu) 0:2.42G u48.9 cpu0 | 250:2.42G u48.9 cpu0 | 500:2.42G u48.8 cpu0 | 750:2.42G u48.9 cpu0 | 1000:2.42G u48.8 cpu0 | 1250:2.42G u48.9 cpu0 | 1500:2.42G u48.9 cpu0 | 1750:2.42G u48.9 cpu0
+  boost idle 4000ms (t_ms:GHz unit_ms cpu) 0:2.41G u49.0 cpu0 | 250:2.42G u48.9 cpu0 | 500:2.42G u48.8 cpu0 | 750:2.42G u48.8 cpu0 | 1000:2.42G u48.9 cpu0 | 1250:2.42G u48.8 cpu0 | 1500:2.40G u48.8 cpu0 | 1750:2.42G u48.8 cpu0
+END part 1/2 chars=7858

@@ -1,0 +1,39 @@
+MobileBench v0.2.1 | app 0.2.1 build 15 (7dcf4a1) | run 2026-11-15T09:02:26Z | part 2/2
+  cluster: kernel threads ms/unit @GHz(load) = Mcycles/unit | matmul: GF, flops/cycle/thread (sieve: limit 40M, sieve1m: limit 1M, matmulN: n=N)
+  cpu7 max2515 cap1024:
+    sieve 1T 62.41ms @2.51G = 156.6Mc cpu7
+    sieve 1T 62.40ms @2.50G = 156.3Mc cpu7
+    matmul128 1T 0.73ms @2.50G = 1.8Mc | 5.74GF 2.29f/c cpu7
+    matmul128 1T 0.73ms @2.50G = 1.8Mc | 5.71GF 2.28f/c cpu7
+    sieve1m 1T 1.33ms @2.51G = 3.3Mc cpu7
+    sieve1m 1T 1.33ms @2.51G = 3.3Mc cpu7
+    matmul576 1T 54.10ms @2.47G = 133.8Mc | 7.06GF 2.86f/c cpu7
+    matmul576 1T 54.43ms @2.49G = 135.4Mc | 7.02GF 2.82f/c cpu7
+  cpu4-6 max2400 cap957:
+    sieve 1T 65.60ms @2.35G = 153.9Mc cpu5
+    sieve 3T(unpinned) 64.32ms @2.44G = 156.6Mc cpu5-7
+    matmul128 1T 0.82ms @2.23G = 1.8Mc | 5.14GF 2.31f/c cpu6
+    matmul128 3T(unpinned) 0.80ms @2.41G = 1.9Mc | 15.87GF 2.20f/c cpu3,5-7
+    sieve1m 1T 1.57ms @2.18G = 3.4Mc cpu4
+    sieve1m 3T 1.46ms @2.39G = 3.5Mc cpu4-6
+    matmul576 1T 58.14ms @2.32G = 134.9Mc | 6.57GF 2.83f/c cpu5
+    matmul576 3T(unpinned) 55.01ms @2.42G = 133.1Mc | 20.84GF 2.87f/c cpu5-7
+  cpu0-3 max1804 cap378:
+    sieve 1T 187.05ms @1.70G = 317.5Mc cpu1-2
+    sieve 4T 186.18ms @1.76G = 327.3Mc cpu0-3
+    matmul128 1T 6.22ms @1.78G = 11.1Mc | 0.67GF 0.38f/c cpu0-3
+    matmul128 4T 6.21ms @1.79G = 11.1Mc | 2.70GF 0.38f/c cpu0-3
+    sieve1m 1T 4.07ms @1.76G = 7.2Mc cpu0,2-3
+    sieve1m 4T 4.17ms @1.78G = 7.4Mc cpu0-3
+    matmul576 1T 568.30ms @1.64G = 934.4Mc | 0.67GF 0.41f/c cpu2-3
+    matmul576 4T 573.22ms @1.70G = 971.9Mc | 2.67GF 0.39f/c cpu0-3
+  n    ws1T     wsMT     1T_GF@GHz(cpu)   MT_GF@GHz   MT/1T  worker_units
+  64 96K 320K 7.32@2.50(cpu7) 28.65@2.11 3.92x [860,688,820,812,707,623,731,863]
+  128 384K 1280K 5.73@2.50(cpu7) 23.11@2.15 4.04x [109,100,89,87,90,112,85,88]
+  192 864K 2880K 7.39@2.48(cpu7) 28.14@2.33 3.81x [30,38,24,32,23,32,23,22]
+  256 1536K 5120K 5.71@2.50(cpu7) 22.10@2.36 3.87x [11,12,14,10,11,11,14,13]
+  384 3456K 11520K 5.56@2.49(cpu7) 21.46@2.40 3.86x [4,4,5,4,4,4,3,4]
+  576 7776K 25920K 7.02@2.49(cpu7) 27.11@2.33 3.86x [4,4,4,4,4,4,4,4]
+  768 13824K 46080K 5.52@2.51(cpu7) 21.25@2.36 3.85x [4,4,4,4,4,4,4,4]
+  freq min/max MHz (887 samples @100ms): 691/1804x4 691/2400x3 806/2515
+END part 2/2 chars=2303

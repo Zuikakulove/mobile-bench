@@ -198,10 +198,20 @@ std::vector<SummaryBlock> summary_blocks(const SuiteResult& r) {
     }
     b.push_back("scores " + scores + "retention " + fixed(r.retention * 100.0, 1) + "% valid=" +
                 (r.valid ? "yes" : "no") + (r.cancelled ? " CANCELLED" : "") +
+                (r.interrupted ? " INTERRUPTED(" + r.interruption + ")" : "") +
                 " cores=" + std::to_string(r.logical_cores) + " diag=" + (r.diagnostics_enabled ? "yes" : "no"));
     b.push_back("baseline " + fixed(r.baseline_ghz, 2) + "GHz(all-core) precondition " +
                 std::to_string(r.precondition.ms) + "ms -> " + fixed(r.precondition.ghz, 2) + "GHz" +
                 (r.precondition.settled ? " settled" : " not-settled"));
+    // 計測中の画面へのタッチ (v0.2.2)。時刻 (スイートの開始からの ms) は先頭の 10 個まで
+    {
+      std::string input = "input touches " + std::to_string(r.input.touches);
+      constexpr size_t kMaxTouchesInSummary = 10;
+      for (size_t i = 0; i < r.input.touch_ms.size() && i < kMaxTouchesInSummary; ++i) {
+        input += (i == 0 ? " at_ms " : " ") + std::to_string(r.input.touch_ms[i]);
+      }
+      b.push_back(input);
+    }
     b.push_back("topology max_mhz " + mhz_groups(r.topology.max_khz) + " capacity " +
                 groups(r.topology.capacity, [](int v) { return std::to_string(v); }));
     b.push_back("columns: run time cpu ghz(before>after) cur(after,MHz) [cap(MHz), only if != max_mhz] | "
@@ -224,7 +234,8 @@ std::vector<SummaryBlock> summary_blocks(const SuiteResult& r) {
     b.push_back("[" + t.phase + " " + t.id + "] median " + ms(t.median_ns) + "ms score " + fixed(t.score, 1) +
                 " threads " + std::to_string(t.threads) + " @" + fixed(t.ghz, 2) + "G spread " +
                 fixed(t.spread * 100.0, 1) + "%" + (t.stable ? "" : " UNSTABLE") + " attempts " +
-                std::to_string(t.attempts) + wait + (t.valid ? "" : " INVALID") +
+                std::to_string(t.attempts) + wait + (t.touches > 0 ? " touches " + std::to_string(t.touches) : "") +
+                (t.valid ? "" : " INVALID") +
                 (t.error.empty() ? "" : " error=" + t.error));
     const std::string before = conditions_diff(t.conditions_before, base);
     const std::string after = conditions_diff(t.conditions_after, base);
@@ -274,21 +285,23 @@ std::vector<SummaryBlock> summary_blocks(const SuiteResult& r) {
     blocks.push_back(std::move(b));
   }
 
-  // ---- 診断: 状態を確かめるクロックの 2 つの求め方 (§6 V22)
+  // ---- 診断: 状態を確かめるクロックの、現行の値と候補 (a)(b) (§6 V22、docs/PHASE1_PLAN.md P3.13 (1))
   {
     const auto& cp = d.clock_probe;
     SummaryBlock b;
     b.push_back("  probe rest " + std::to_string(cp.rest_ms) + "ms load " + std::to_string(cp.load_ms) +
                 "ms workers " + std::to_string(cp.workers) + " | current = mean of per-worker estimate after load,"
-                " counted = adds in " + std::to_string(cp.count_from_ms) + "-" + std::to_string(cp.load_ms) +
-                "ms / time (GHz, per-worker min-max)");
-    std::vector<double> cur, cnt;
+                " inload = mean of per-worker estimate at " + std::to_string(cp.inload_at_ms) +
+                "ms while all workers keep loading (GHz, per-worker min-max)");
+    std::vector<double> cur, cur_max, inl, inl_max;
     for (const auto& s : cp.samples) {
       b.push_back("    " + std::to_string(s.t_ms) + "ms current " + fixed(s.current_ghz, 3) + " (" +
-                  fixed(s.current_min, 2) + "-" + fixed(s.current_max, 2) + ") counted " + fixed(s.counted_ghz, 3) +
-                  " (" + fixed(s.counted_min, 2) + "-" + fixed(s.counted_max, 2) + ")");
+                  fixed(s.current_min, 2) + "-" + fixed(s.current_max, 2) + ") inload " + fixed(s.inload_ghz, 3) +
+                  " (" + fixed(s.inload_min, 2) + "-" + fixed(s.inload_max, 2) + ")");
       if (s.current_ghz > 0) cur.push_back(s.current_ghz);
-      if (s.counted_ghz > 0) cnt.push_back(s.counted_ghz);
+      if (s.current_max > 0) cur_max.push_back(s.current_max);
+      if (s.inload_ghz > 0) inl.push_back(s.inload_ghz);
+      if (s.inload_max > 0) inl_max.push_back(s.inload_max);
     }
     auto range = [](const std::vector<double>& v) {
       if (v.empty()) return std::string("-");
@@ -299,7 +312,8 @@ std::vector<SummaryBlock> summary_blocks(const SuiteResult& r) {
       return fixed(mean, 3) + " range " + fixed((*hi - *lo) / mean * 100.0, 1) + "%";
     };
     b.push_back("  probe " + std::to_string(cp.samples.size()) + " samples: current mean " + range(cur) +
-                " | counted mean " + range(cnt) + " (range = (max-min)/mean)");
+                " | (a) current-max mean " + range(cur_max) + " | (b) inload mean " + range(inl) +
+                " | inload-max mean " + range(inl_max) + " (range = (max-min)/mean)");
     blocks.push_back(std::move(b));
   }
 

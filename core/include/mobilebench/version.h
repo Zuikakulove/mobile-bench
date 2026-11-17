@@ -15,10 +15,13 @@
 //   0.2.1  要約をパートに分割 (JSON の schema 6)。診断モードに、クラスタ別の篩 (上限 100 万) と
 //          行列積 (n=576)、状態を確かめるクロックの 2 つの求め方の比較を追加。OS のビルド番号を記録。
 //          計測区間・処理単位・計測手順・基準時間・フラグは 0.2.0 と同じ (docs/DESIGN.md §5.3 の PATCH)
+//   0.2.2  計測中にアプリが前面を離れたら中止して無効にする (Runner::interrupt)。計測中の画面へのタッチを記録する
+//          (判定には使わない)。診断モードのクロックの比較を、現行の値と候補 (a)(b) に入れ替えた (JSON の schema 7)。
+//          計測区間・処理単位・計測手順・基準時間・フラグは 0.2.1 と同じ (§5.3 の PATCH。docs/PHASE1_PLAN.md J2)
 #pragma once
 
 namespace mb {
 
-inline constexpr const char* kBenchmarkVersion = "0.2.1";
+inline constexpr const char* kBenchmarkVersion = "0.2.2";
 
 }  // namespace mb

@@ -29,6 +29,9 @@ fun interface ConditionProvider {
 
 /** JNI の宣言 (実装は src/main/cpp/jni_bridge.cpp)。 */
 object NativeLib {
+    /** [nativeInterrupt] の理由: 計測中にアプリが前面を離れた (core の mb::kInterruptLeftForeground と同じ) */
+    const val INTERRUPT_LEFT_FOREGROUND = "left_foreground"
+
     init {
         System.loadLibrary("mobilebench_jni")
     }
@@ -41,13 +44,15 @@ object NativeLib {
     ): Long
     external fun nativeRun(handle: Long, listener: ProgressListener?, conditionProvider: ConditionProvider?): ByteArray
     external fun nativeCancel(handle: Long)
+    external fun nativeInterrupt(handle: Long, reason: String)
+    external fun nativeNoteTouch(handle: Long)
     external fun nativeDestroy(handle: Long)
 }
 
 /**
  * core の Runner 1 回分のラッパー。
  * [run] は呼び出しスレッドをブロックするので、必ずバックグラウンドから呼ぶこと。
- * [cancel] は任意のスレッドから呼んでよい。
+ * [cancel]、[interrupt]、[noteTouch] は任意のスレッドから呼んでよい。
  */
 class NativeBench(device: Map<String, String>, scratchDir: String, diagnostics: Boolean) : AutoCloseable {
     private val lock = Any()
@@ -68,6 +73,20 @@ class NativeBench(device: Map<String, String>, scratchDir: String, diagnostics: 
     fun cancel() {
         synchronized(lock) {
             if (handle != 0L) NativeLib.nativeCancel(handle)
+        }
+    }
+
+    /** 計測を中止し、結果を無効にする (利用者の中止 [cancel] とは区別して記録される)。 */
+    fun interrupt(reason: String) {
+        synchronized(lock) {
+            if (handle != 0L) NativeLib.nativeInterrupt(handle, reason)
+        }
+    }
+
+    /** 画面へのタッチを記録する (計測中だけ記録される。判定には使わない)。 */
+    fun noteTouch() {
+        synchronized(lock) {
+            if (handle != 0L) NativeLib.nativeNoteTouch(handle)
         }
     }
 

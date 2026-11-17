@@ -3,7 +3,8 @@
 //
 // .github/workflows/ios.yml が、BenchmarkResult.swift とこのファイルを swiftc でコンパイルして実行する:
 //   swift_parse_check <JSON のパス>
-// 読めない (例外が出る) か、tests / summary_parts / diagnostics.matmul_sweep が空なら、終了コード 1 で終わる。
+// 読めない (例外が出る) か、tests / summary_parts / diagnostics.matmul_sweep が空か、
+// interrupted / interruption (schema 7) が読めなければ、終了コード 1 で終わる。
 import Foundation
 
 let args = CommandLine.arguments
@@ -19,8 +20,12 @@ do {
     if result.tests.isEmpty { errors.append("tests is empty") }
     if (result.summaryParts ?? []).filter({ !$0.isEmpty }).isEmpty { errors.append("summary_parts is empty") }
     if (result.diagnostics?.matmulSweep ?? []).isEmpty { errors.append("diagnostics.matmul_sweep is empty") }
+    // schema 7 で足したキー (モデルでは省略可能にしているので、読めたことを確かめる)
+    if result.interrupted == nil { errors.append("interrupted is missing") }
+    if result.interruption == nil { errors.append("interruption is missing") }
     print("benchmark_version \(result.benchmarkVersion), tests \(result.tests.count), " +
           "summary_parts \(result.summaryParts?.count ?? 0), matmul_sweep \(result.diagnostics?.matmulSweep.count ?? 0), " +
+          "interrupted \(result.interrupted.map { String($0) } ?? "nil"), " +
           "build \(result.build.os) \(result.build.arch) \(result.build.compiler)")
     if !errors.isEmpty {
         for e in errors { print("ERROR: \(e)") }

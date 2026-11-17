@@ -42,6 +42,8 @@ struct ContentView: View {
             }
             .navigationTitle("MobileBench")
         }
+        // 画面へのタッチを記録する (docs/PHASE1_PLAN.md P3.11)。ウィンドウに付けるだけで、操作は妨げない
+        .background(TouchObserver { viewModel.noteTouch() })
     }
 }
 
@@ -86,9 +88,9 @@ private struct ResultSection: View {
                 Text("持続率 \(formatScore(retention * 100))%").font(.subheadline)
             }
             Text("benchmark v\(result.benchmarkVersion)").font(.caption)
-            if !result.valid {
-                Text(result.cancelled ? "中止されました" : "一部のテストが無効です (チェックサム不一致)")
-                    .foregroundStyle(.red)
+            // 無効の理由を分けて出す: 利用者の中止 / 前面を離れた / チェックサム不一致 (docs/PHASE1_PLAN.md P3.17)
+            ForEach(invalidReasons, id: \.self) { reason in
+                Text(reason).foregroundStyle(.red)
             }
         }
         .frame(maxWidth: .infinity)
@@ -130,6 +132,23 @@ private struct ResultSection: View {
         Text(buildInfoText)
             .font(.caption)
         RawJsonView(json: rawJson)
+    }
+
+    private var invalidReasons: [String] {
+        if result.valid { return [] }
+        var reasons: [String] = []
+        if result.cancelled { reasons.append("中止されました") }
+        if result.interrupted == true {
+            let reason = result.interruption ?? ""
+            reasons.append(reason == MBInterruptLeftForeground
+                ? "計測中にアプリが前面を離れたため、無効です"
+                : "計測が中断されたため、無効です (\(reason))")
+        }
+        // テストが無効 (チェックサム不一致など) のとき。中止でも中断でもないのに無効なときも、この文言を出す
+        if result.tests.contains(where: { !$0.valid }) || reasons.isEmpty {
+            reasons.append("一部のテストが無効です (チェックサム不一致)")
+        }
+        return reasons
     }
 
     private func summaryButtonTitle(index: Int, count: Int) -> String {

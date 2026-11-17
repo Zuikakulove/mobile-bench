@@ -4,6 +4,7 @@
 #include <atomic>
 #include <functional>
 #include <map>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,9 @@ inline constexpr int kMeasuredRuns = 5;
 //   sustained : 全コアに負荷をかけて状態を落ち着かせた後、休まず続けて測る (持続性能)
 inline constexpr const char* kPhasePeak = "peak";
 inline constexpr const char* kPhaseSustained = "sustained";
+
+// Runner::interrupt の理由 (JSON の interruption、要約の INTERRUPTED(…))
+inline constexpr const char* kInterruptLeftForeground = "left_foreground";
 
 struct Progress {
   std::string phase;   // "prepare" / "peak" / "sustained" / "diagnostics"
@@ -96,8 +100,20 @@ class Runner {
   using SuiteFactory = std::function<std::vector<TestPtr>()>;
   SuiteResult run_with_factory(const SuiteFactory& factory, const ProgressCallback& progress = {});
 
-  // 別スレッドから呼んでよい。現在の 1 回の計測が終わった時点で中断する。
-  void cancel() { cancelled_.store(true); }
+  // 別スレッドから呼んでよい。現在の 1 回の計測が終わった時点で中断する (利用者による中止)。
+  void cancel() {
+    cancelled_.store(true);
+    stop_.store(true);
+  }
+
+  // 別スレッドから呼んでよい。cancel() と同じ箇所で計測を中止し、結果を無効にする (docs/PHASE1_PLAN.md P3.10)。
+  // 結果は interrupted = true、interruption = reason になる。cancelled は立てない (利用者の中止と区別する)。
+  // プラットフォーム層は、計測中にアプリが前面を離れたら reason = kInterruptLeftForeground で呼ぶ
+  void interrupt(const std::string& reason);
+
+  // 別スレッドから呼んでよい。画面へのタッチ (指が触れた時点) を記録する (docs/PHASE1_PLAN.md P3.11)。
+  // run() の実行中だけ、スイートの開始からの時刻を記録する。実行中でなければ無視する。判定とスコアには使わない
+  void note_touch();
 
   // run() の前に設定する。nullptr なら状態は記録しない
   void set_condition_probe(ConditionProbe probe) { condition_probe_ = std::move(probe); }
@@ -107,10 +123,20 @@ class Runner {
                        int measured_runs, bool full_procedure, bool diagnostics);
 
   Conditions probe_conditions();
+  int touch_count();  // これまでに記録したタッチの数 (計測区間の外でだけ読む)
 
   RunConfig config_;
   ConditionProbe condition_probe_;
-  std::atomic<bool> cancelled_{false};
+  std::atomic<bool> stop_{false};       // cancel() か interrupt() で立つ。計測の各所はこれを見て止まる
+  std::atomic<bool> cancelled_{false};  // cancel() が呼ばれた
+  // interrupt() とタッチの記録 (UI のスレッドから呼ばれる)。計測スレッドは計測区間の外でだけ読む
+  std::mutex input_mutex_;
+  bool interrupted_ = false;
+  std::string interruption_;
+  bool running_ = false;
+  std::int64_t run_t0_ns_ = 0;
+  int touches_ = 0;
+  std::vector<std::int64_t> touch_ms_;
 };
 
 // 既定スイートを構築する (src/registry.cpp)

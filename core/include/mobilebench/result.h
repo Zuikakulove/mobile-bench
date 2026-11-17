@@ -37,6 +37,9 @@ struct TestResult {
   int wait_ms = -1;         // peak: 計測前の回復待ち時間 (待っていない場合 -1)
   bool recovered = true;    // peak: 待ち時間内に基準クロックまで回復したか
   double recovery_ghz = 0.0;  // peak: 回復判定時の全コア実効クロック
+
+  // v0.2.2: このテストの間 (最初の休みの開始から、最後の計測の終わりまで) の画面へのタッチの数
+  int touches = 0;
 };
 
 struct PhaseResult {
@@ -50,6 +53,14 @@ struct PreconditionResult {
   int ms = 0;               // 事前負荷の時間
   double ghz = 0.0;         // 事前負荷の最後の全コア実効クロック
   bool settled = false;     // クロックが落ち着いたか (false = 上限時間で打ち切り)
+};
+
+// 計測中の画面へのタッチの記録 (v0.2.2。docs/PHASE1_PLAN.md P3.11)。判定とスコアには使わない
+inline constexpr std::size_t kMaxTouchTimes = 100;  // touch_ms に残す数 (先頭から)
+
+struct InputRecord {
+  int touches = 0;                    // run() の実行中のタッチの数 (開始のタッチは含まない)
+  std::vector<std::int64_t> touch_ms; // スイートの開始からの時刻 (ms)。先頭の kMaxTouchTimes 個まで
 };
 
 struct BuildInfo {
@@ -76,7 +87,10 @@ struct SuiteResult {
   double baseline_ghz = 0.0;   // 開始時の全コア実効クロック (回復判定の基準)
   PreconditionResult precondition;
   bool valid = false;          // 全テストが valid か
-  bool cancelled = false;
+  bool cancelled = false;      // 利用者が中止した
+  bool interrupted = false;    // Runner::interrupt で中止した (計測中にアプリが前面を離れた、など)
+  std::string interruption;    // その理由 ("left_foreground")。なければ空
+  InputRecord input;
   CpuTopology topology;
   bool diagnostics_enabled = false;
   Diagnostics diagnostics;  // diagnostics_enabled のときのみ JSON に出力

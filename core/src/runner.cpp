@@ -56,6 +56,30 @@ Conditions Runner::probe_conditions() {
   }
 }
 
+void Runner::interrupt(const std::string& reason) {
+  {
+    std::lock_guard<std::mutex> lock(input_mutex_);
+    if (!interrupted_) {  // 最初の理由を残す
+      interrupted_ = true;
+      interruption_ = reason;
+    }
+  }
+  stop_.store(true);
+}
+
+void Runner::note_touch() {
+  const std::int64_t t = now_ns();
+  std::lock_guard<std::mutex> lock(input_mutex_);
+  if (!running_) return;
+  ++touches_;
+  if (touch_ms_.size() < kMaxTouchTimes) touch_ms_.push_back((t - run_t0_ns_) / 1'000'000);
+}
+
+int Runner::touch_count() {
+  std::lock_guard<std::mutex> lock(input_mutex_);
+  return touches_;
+}
+
 namespace {
 
 double mean_positive(const std::vector<double>& v) {
@@ -153,6 +177,14 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   suite.logical_cores = logical_core_count();
   suite.topology = platform::read_cpu_topology(suite.logical_cores);
   suite.diagnostics_enabled = diagnostics;
+  {
+    std::lock_guard<std::mutex> lock(input_mutex_);
+    running_ = true;
+    run_t0_ns_ = suite_t0;
+    touches_ = 0;
+    touch_ms_.clear();
+    touch_ms_.reserve(kMaxTouchTimes);
+  }
 
   detail::FreqSampler sampler;
   if (diagnostics) sampler.start(suite.logical_cores, /*interval_ms=*/100, suite_t0);
@@ -204,7 +236,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   }
 
   bool aborted = false;
-  for (size_t pi = 0; pi < plans.size() && !aborted && !cancelled_.load(); ++pi) {
+  for (size_t pi = 0; pi < plans.size() && !aborted && !stop_.load(); ++pi) {
     const PhasePlan& plan = plans[pi];
     std::vector<TestPtr>& tests = phase_tests[pi];
     p.phase = plan.name;
@@ -219,7 +251,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
       p.test_name = "Preconditioning (all-core load)";
       double prev = 0.0;
       int elapsed = 0;
-      while (!cancelled_.load()) {
+      while (!stop_.load()) {
         p.wait_ms = elapsed;
         report();
         const double g = loaded_probe(*load_pool, policy.precondition_chunk_ms);
@@ -241,17 +273,20 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
     std::vector<double> scores;
     bool phase_valid = !tests.empty();
     bool phase_stable = true;
-    for (size_t ti = 0; ti < tests.size() && !cancelled_.load(); ++ti) {
+    for (size_t ti = 0; ti < tests.size() && !stop_.load(); ++ti) {
       BenchmarkTest& test = *tests[ti];
       const TestInfo info = test.info();
       p.test_index = static_cast<int>(ti);
       p.test_id = info.id;
       const int step_at_test_start = p.step;
+      // このテストのタッチの数: 最初の休みの開始から、最後の計測の終わりまで (どちらも計測区間の外で読む)
+      const int touches_at_test_start = touch_count();
+      int touches_at_last_run_end = touches_at_test_start;
 
       TestResult best;
       bool have_best = false;
       int attempts = 0;
-      for (int attempt = 1; attempt <= 1 + policy.max_retries && !cancelled_.load(); ++attempt) {
+      for (int attempt = 1; attempt <= 1 + policy.max_retries && !stop_.load(); ++attempt) {
         attempts = attempt;
         p.attempt = attempt;
         p.step = step_at_test_start;
@@ -266,9 +301,9 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
           recovered = false;
           p.wait_ms = 0;
           report();
-          sleep_ms(policy.min_rest_ms, cancelled_);
+          sleep_ms(policy.min_rest_ms, stop_);
           waited = policy.min_rest_ms;
-          while (!cancelled_.load()) {
+          while (!stop_.load()) {
             recovery_ghz = loaded_probe(*load_pool, policy.probe_load_ms);
             if (suite.baseline_ghz <= 0 || recovery_ghz >= suite.baseline_ghz * policy.recovered_ratio) {
               recovered = true;
@@ -277,7 +312,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
             if (waited >= policy.max_wait_ms) break;
             p.wait_ms = waited;
             report();
-            sleep_ms(policy.check_interval_ms, cancelled_);
+            sleep_ms(policy.check_interval_ms, stop_);
             waited += policy.check_interval_ms;
           }
           p.wait_ms = -1;
@@ -304,7 +339,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
           r.conditions_before = probe_conditions();
           int run = 0;
           for (; run < runs_per_test; ++run) {
-            if (cancelled_.load()) break;
+            if (stop_.load()) break;
             p.warmup = run < warmup_runs;
             report();
 
@@ -334,6 +369,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
             }
             ++p.step;
           }
+          touches_at_last_run_end = touch_count();
           completed = run == runs_per_test;
           r.conditions_after = probe_conditions();
           test.teardown();
@@ -367,6 +403,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
         break;
       }
       best.attempts = attempts;
+      best.touches = touches_at_last_run_end - touches_at_test_start;
       phase_valid = phase_valid && best.valid;
       phase_stable = phase_stable && best.stable;
       scores.push_back(best.score);
@@ -375,7 +412,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
 
     PhaseResult pr;
     pr.name = plan.name;
-    pr.valid = phase_valid && scores.size() == tests.size() && !cancelled_.load();
+    pr.valid = phase_valid && scores.size() == tests.size() && !stop_.load();
     pr.stable = phase_stable;
     pr.score = pr.valid ? geometric_mean(scores) : 0.0;
     suite.phases.push_back(pr);
@@ -383,7 +420,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   load_pool.reset();
 
   // 診断モード: スコア対象外の計測
-  if (diagnostics && !cancelled_.load()) {
+  if (diagnostics && !stop_.load()) {
     p.phase = "diagnostics";
     p.test_index = 0;
     p.test_count = 0;
@@ -392,7 +429,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
     p.attempt = 1;
     suite.diagnostics.conditions_before = probe_conditions();
     try {
-      detail::run_diagnostics(ctx.threads, suite.topology, clusters, diag_options, cancelled_,
+      detail::run_diagnostics(ctx.threads, suite.topology, clusters, diag_options, stop_,
                               [&](const std::string& label, bool warmup) {
                                 p.test_name = label;
                                 p.warmup = warmup;
@@ -407,10 +444,20 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   }
   suite.diagnostics.freq = sampler.stop();
 
-  suite.cancelled = cancelled_.load();
+  // 中止・中断とタッチの記録は、ここで 1 回だけ読む (これより後の interrupt() とタッチは、この結果に入れない)
+  {
+    std::lock_guard<std::mutex> lock(input_mutex_);
+    running_ = false;
+    suite.cancelled = cancelled_.load();
+    suite.interrupted = interrupted_;
+    suite.interruption = interruption_;
+    suite.input.touches = touches_;
+    suite.input.touch_ms = touch_ms_;
+  }
+  const bool stopped = suite.cancelled || suite.interrupted;
   bool all_valid = !suite.phases.empty() && suite.phases.size() == plans.size();
   for (const auto& ph : suite.phases) all_valid = all_valid && ph.valid;
-  suite.valid = all_valid && !suite.cancelled;
+  suite.valid = all_valid && !stopped;
   suite.overall_score = !suite.phases.empty() && suite.phases.front().valid ? suite.phases.front().score : 0.0;
   if (suite.phases.size() >= 2 && suite.phases[0].score > 0 && suite.phases[1].valid) {
     suite.retention = suite.phases[1].score / suite.phases[0].score;
@@ -422,7 +469,7 @@ SuiteResult Runner::run_impl(const SuiteFactory& factory, const ProgressCallback
   p.step = p.total_steps;
   p.warmup = false;
   p.wait_ms = -1;
-  if (!suite.cancelled) report();
+  if (!stopped) report();
   return suite;
 }
 

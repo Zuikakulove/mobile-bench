@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import UIKit
 
@@ -25,6 +26,18 @@ final class BenchmarkViewModel: ObservableObject {
     /// 診断モード (行列サイズ掃引など)。スコアには影響しない
     @Published var diagnostics = false
     private var bridge: MBBenchmarkBridge?
+    private var backgroundObserver: AnyCancellable?
+
+    init() {
+        // 計測中にアプリが前面を離れたら、計測を中止して無効にする (docs/PHASE1_PLAN.md P3.10、J6)。
+        // UIApplication.didEnterBackgroundNotification は、アプリがバックグラウンドに入ったときに送られる
+        backgroundObserver = NotificationCenter.default
+            .publisher(for: UIApplication.didEnterBackgroundNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in self.handleLeftForeground() }
+            }
+    }
 
     var isRunning: Bool {
         if case .running = state { return true }
@@ -75,6 +88,18 @@ final class BenchmarkViewModel: ObservableObject {
 
     func cancel() {
         bridge?.cancel()
+    }
+
+    /// 計測中なら中止して、結果を無効にする。計測中でなければ何もしない
+    private func handleLeftForeground() {
+        guard isRunning else { return }
+        bridge?.interrupt(withReason: MBInterruptLeftForeground)
+    }
+
+    /// 画面に指が触れた (TouchObserver から呼ばれる)。計測中だけ core が記録する (判定には使わない)
+    func noteTouch() {
+        guard isRunning else { return }
+        bridge?.noteTouch()
     }
 
     private func finish(_ json: String) {

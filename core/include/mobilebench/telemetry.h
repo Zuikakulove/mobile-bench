@@ -119,25 +119,29 @@ struct BoostTrace {
   std::vector<BoostSample> samples;
 };
 
-// 状態を確かめるクロックの、2 つの求め方の比較 (診断。docs/DESIGN.md §5.5、§6 V22)。
-// 同じ全コア負荷 1 回から、両方の値を求める。判定には使わない。
-//   current: 現行の求め方。負荷の直後に各ワーカーが短く推定した値 (estimate_clock_ghz) の平均
-//   counted: 案の求め方。負荷の後半に各ワーカーが回した加算の数の合計 ÷ 各ワーカーの時間の合計
+// 状態を確かめるクロックの求め方の比較 (診断。docs/DESIGN.md §5.5、§6 V22、docs/PHASE1_PLAN.md P3.13 (1))。
+// 同じ全コア負荷 1 回から、現行の値と候補の値を求める。判定には使わない。
+// 負荷は、ワーカーを起こす直前に読んだ共通の時刻 T0 から数える。
+//   current: 現行の求め方。各ワーカーが自分の開始から load_ms の負荷をかけた直後に推定した値 (estimate_clock_ghz)
+//   inload : 候補 (b)。全ワーカーが T0 + inload_at_ms まで負荷をかけ、その時点で推定した値。
+//            推定の間も、ほかのワーカーは負荷を続けている (推定の後、各ワーカーは load_ms まで負荷を続ける)
+// 候補 (a) (ワーカーごとの推定値の最大) は current_max である。
+// *_ghz はワーカーの平均、*_min / *_max はワーカーごとの値の最小 / 最大 (0 = 推定できなかった)
 struct ClockProbeSample {
   std::int64_t t_ms = 0;       // 比較の開始からの経過 (負荷の開始時点)
   double current_ghz = 0.0;
-  double current_min = 0.0;    // ワーカーごとの値の最小 / 最大
+  double current_min = 0.0;
   double current_max = 0.0;
-  double counted_ghz = 0.0;
-  double counted_min = 0.0;
-  double counted_max = 0.0;
+  double inload_ghz = 0.0;
+  double inload_min = 0.0;
+  double inload_max = 0.0;
 };
 
 struct ClockProbeComparison {
   int workers = 0;
   int rest_ms = 0;             // 各回の負荷の前に休む時間 (ピーク段階の最低の休みと同じ)
   int load_ms = 0;             // 全コアにかける負荷の長さ (ピーク段階の確認と同じ)
-  int count_from_ms = 0;       // counted で数え始める時刻 (負荷の開始から)
+  int inload_at_ms = 0;        // 候補 (b) を推定する時点 (T0 から)。max(load_ms - 15, load_ms / 2)
   std::vector<ClockProbeSample> samples;
 };
 

@@ -2,6 +2,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+/// interruptWithReason: の理由: 計測中にアプリが前面を離れた (core の mb::kInterruptLeftForeground と同じ値)
+/// (C++ から読み込んでも C のリンケージになるよう FOUNDATION_EXPORT で宣言する)
+FOUNDATION_EXPORT NSString *const MBInterruptLeftForeground;
+
 /// core からの進捗通知。計測スレッド (バックグラウンド) から呼ばれる。
 /// phase: "prepare" / "peak" / "sustained" / "diagnostics"
 /// waitMs: 回復待ち・事前負荷の経過時間 (それ以外は -1)、attempt: 測り直しの回数 (1 始まり)
@@ -29,6 +33,13 @@ NS_SWIFT_SENDABLE
 
 /// 任意のスレッドから呼んでよい。
 - (void)cancel;
+
+/// 計測を中止し、結果を無効にする (利用者の中止 cancel とは区別して記録される)。任意のスレッドから呼んでよい。
+/// 計測中にアプリが前面を離れたら、reason に MBInterruptLeftForeground を渡す (docs/PHASE1_PLAN.md P3.10)
+- (void)interruptWithReason:(NSString *)reason;
+
+/// 画面に指が触れたときに呼ぶ。計測中だけ core が記録する (判定には使わない)。任意のスレッドから呼んでよい
+- (void)noteTouch;
 
 + (NSString *)benchmarkVersion;
 

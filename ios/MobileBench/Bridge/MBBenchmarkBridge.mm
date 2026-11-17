@@ -22,6 +22,17 @@ NSString *ErrorJson(NSString *message) {
 
 }  // namespace
 
+namespace {
+constexpr bool SameString(const char *a, const char *b) {
+  return *a == *b && (*a == '\0' || SameString(a + 1, b + 1));
+}
+}  // namespace
+
+// 文字列リテラルで定義し (静的な初期化にする)、core の値と同じことをコンパイル時に確かめる
+NSString *const MBInterruptLeftForeground = @"left_foreground";
+static_assert(SameString(mb::kInterruptLeftForeground, "left_foreground"),
+              "MBInterruptLeftForeground must match mb::kInterruptLeftForeground");
+
 @implementation MBBenchmarkBridge {
   std::unique_ptr<mb::Runner> _runner;
 }
@@ -75,6 +86,14 @@ NSString *ErrorJson(NSString *message) {
 
 - (void)cancel {
   _runner->cancel();
+}
+
+- (void)interruptWithReason:(NSString *)reason {
+  _runner->interrupt(ToStd(reason));
+}
+
+- (void)noteTouch {
+  _runner->note_touch();
 }
 
 + (NSString *)benchmarkVersion {

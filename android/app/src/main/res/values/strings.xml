@@ -22,6 +22,8 @@
     <string name="unstable_short">不安定</string>
     <string name="invalid">一部のテストが無効です (チェックサム不一致)</string>
     <string name="cancelled">中止されました</string>
+    <string name="interrupted_left_foreground">計測中にアプリが前面を離れたため、無効です</string>
+    <string name="interrupted_other">計測が中断されたため、無効です (%1$s)</string>
     <string name="failed">エラー: %1$s</string>
     <string name="show_json">結果 JSON を表示</string>
     <string name="hide_json">結果 JSON を隠す</string>

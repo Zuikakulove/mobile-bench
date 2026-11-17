@@ -1,6 +1,9 @@
 package com.mobilebench.app.bench
 
 import java.io.File
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -24,5 +27,16 @@ class BenchmarkResultParseTest {
         assertTrue("tests is empty", result.tests.isNotEmpty())
         assertTrue("summaryParts is empty", result.summaryParts.isNotEmpty())
         assertTrue("sweep (diagnostics.matmul_sweep) is empty", result.sweep.isNotEmpty())
+
+        // schema 7 で足したキー。パーサは省略時の値で読むので、キーがあること自体も確かめる
+        val root = JSONObject(json)
+        assertEquals("schema_version", 7, root.getInt("schema_version"))
+        for (key in listOf("interrupted", "interruption", "input")) {
+            assertTrue("$key is missing", root.has(key))
+        }
+        assertFalse("interrupted (the CLI run is not interrupted)", result.interrupted)
+        assertEquals("interruption", "", result.interruption)
+        assertEquals("interrupted", root.getBoolean("interrupted"), result.interrupted)
+        assertEquals("interruption", root.getString("interruption"), result.interruption)
     }
 }

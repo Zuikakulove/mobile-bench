@@ -47,6 +47,7 @@ import com.mobilebench.app.BuildConfig
 import com.mobilebench.app.R
 import com.mobilebench.app.UiState
 import com.mobilebench.app.bench.BenchmarkResult
+import com.mobilebench.app.bench.NativeLib
 import java.util.Locale
 
 @Composable
@@ -156,11 +157,9 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
                 )
             }
             Text("benchmark v${result.benchmarkVersion}", style = MaterialTheme.typography.bodySmall)
-            if (!result.valid) {
-                Text(
-                    stringResource(if (result.cancelled) R.string.cancelled else R.string.invalid),
-                    color = MaterialTheme.colorScheme.error,
-                )
+            // 無効の理由を分けて出す: 利用者の中止 / 前面を離れた / チェックサム不一致 (docs/PHASE1_PLAN.md P3.17)
+            invalidReasons(result).forEach { reason ->
+                Text(reason, color = MaterialTheme.colorScheme.error)
             }
         }
     }
@@ -185,6 +184,23 @@ private fun ResultSection(result: BenchmarkResult, rawJson: String) {
         style = MaterialTheme.typography.bodySmall,
     )
     RawJson(rawJson)
+}
+
+@Composable
+private fun invalidReasons(result: BenchmarkResult): List<String> {
+    if (result.valid) return emptyList()
+    val reasons = mutableListOf<String>()
+    if (result.cancelled) reasons += stringResource(R.string.cancelled)
+    if (result.interrupted) {
+        reasons += if (result.interruption == NativeLib.INTERRUPT_LEFT_FOREGROUND) {
+            stringResource(R.string.interrupted_left_foreground)
+        } else {
+            stringResource(R.string.interrupted_other, result.interruption)
+        }
+    }
+    // テストが無効 (チェックサム不一致など) のとき。中止でも中断でもないのに無効なときも、この文言を出す
+    if (result.tests.any { !it.valid } || reasons.isEmpty()) reasons += stringResource(R.string.invalid)
+    return reasons
 }
 
 @Composable

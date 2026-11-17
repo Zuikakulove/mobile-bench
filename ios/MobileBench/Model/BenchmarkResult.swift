@@ -1,6 +1,6 @@
 import Foundation
 
-/// core が返す JSON (schema_version 6) の表示用モデル。
+/// core が返す JSON (schema_version 7) の表示用モデル。
 /// スコア計算などは一切行わず、JSON の値をそのまま読むだけ。
 struct BenchmarkResult: Decodable {
     struct Config: Decodable {
@@ -108,6 +108,10 @@ struct BenchmarkResult: Decodable {
     let scores: Scores?
     let valid: Bool
     let cancelled: Bool
+    /// 計測中にアプリが前面を離れたなどで中断され、無効になったか (schema 7。省略可能)
+    let interrupted: Bool?
+    /// 中断の理由 ("left_foreground")。なければ空 (schema 7。省略可能)
+    let interruption: String?
     let config: Config
     let build: Build
     let tests: [TestEntry]

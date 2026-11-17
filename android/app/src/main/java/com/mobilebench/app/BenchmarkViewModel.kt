@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.mobilebench.app.bench.BenchmarkResult
 import com.mobilebench.app.bench.ConditionProvider
 import com.mobilebench.app.bench.NativeBench
+import com.mobilebench.app.bench.NativeLib
 import com.mobilebench.app.bench.ProgressListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,6 +100,19 @@ class BenchmarkViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun cancel() {
         current?.cancel()
+    }
+
+    /**
+     * 計測中にアプリが前面を離れた (MainActivity.onStop。構成変更によるものを除く)。
+     * 計測中なら中止して、結果を無効にする (docs/PHASE1_PLAN.md P3.10)。計測中でなければ何もしない。
+     */
+    fun onLeftForeground() {
+        current?.interrupt(NativeLib.INTERRUPT_LEFT_FOREGROUND)
+    }
+
+    /** 画面に指が触れた (MainActivity.dispatchTouchEvent の ACTION_DOWN)。計測中だけ core が記録する。 */
+    fun onTouchDown() {
+        current?.noteTouch()
     }
 
     override fun onCleared() {

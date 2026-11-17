@@ -131,6 +131,21 @@ extern "C" JNIEXPORT void JNICALL Java_com_mobilebench_app_bench_NativeLib_nativ
   if (auto* runner = from_handle(handle)) runner->cancel();
 }
 
+// 計測中にアプリが前面を離れたときなどに、UI のスレッドから呼ぶ。計測を中止し、結果を無効にする (cancel とは区別する)
+extern "C" JNIEXPORT void JNICALL Java_com_mobilebench_app_bench_NativeLib_nativeInterrupt(JNIEnv* env,
+                                                                                           jobject /*thiz*/,
+                                                                                           jlong handle,
+                                                                                           jstring reason) {
+  if (auto* runner = from_handle(handle)) runner->interrupt(to_std_string(env, reason));
+}
+
+// 画面に指が触れたときに、UI のスレッドから呼ぶ。計測中だけ記録される (判定には使わない)
+extern "C" JNIEXPORT void JNICALL Java_com_mobilebench_app_bench_NativeLib_nativeNoteTouch(JNIEnv* /*env*/,
+                                                                                           jobject /*thiz*/,
+                                                                                           jlong handle) {
+  if (auto* runner = from_handle(handle)) runner->note_touch();
+}
+
 extern "C" JNIEXPORT void JNICALL Java_com_mobilebench_app_bench_NativeLib_nativeDestroy(JNIEnv* /*env*/,
                                                                                          jobject /*thiz*/,
                                                                                          jlong handle) {

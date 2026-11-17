@@ -4,7 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * core が返す JSON (schema_version 6) の表示用モデル。
+ * core が返す JSON (schema_version 7) の表示用モデル。
  * スコア計算などは一切行わず、JSON の値を読んで表示しやすい形にまとめるだけ。
  */
 data class BenchmarkResult(
@@ -17,6 +17,10 @@ data class BenchmarkResult(
     val sustainedStable: Boolean,
     val valid: Boolean,
     val cancelled: Boolean,
+    /** 計測中にアプリが前面を離れたなどで中断され、無効になったか (schema 7) */
+    val interrupted: Boolean,
+    /** 中断の理由 ("left_foreground")。なければ空 */
+    val interruption: String,
     val logicalCores: Int,
     val build: Map<String, String>,
     val tests: List<TestEntry>,
@@ -113,6 +117,8 @@ data class BenchmarkResult(
                 sustainedStable = sustained?.optBoolean("stable", true) ?: true,
                 valid = root.getBoolean("valid"),
                 cancelled = root.getBoolean("cancelled"),
+                interrupted = root.optBoolean("interrupted", false),
+                interruption = root.optString("interruption", ""),
                 logicalCores = root.getJSONObject("config").getInt("logical_cores"),
                 build = build,
                 tests = tests,

@@ -1,0 +1,1534 @@
+# カーネルの位置: build 12 と build 15 (CI でビルドし直したものと、実機で使った APK の比較)
+
+workflow run 43984178710 (attempt 1) / commit d827594c70a335e6ef70c4844ad52320dafbb6f9
+
+# カーネルの位置: 0.2.0 build 12 を CI でビルドし直したもの (コミット 81459380084adcf78956a54be0e7ec4aeb672f53)
+
+tools: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm: LLVM version 18.0.3 / /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump: LLVM version 18.0.3
+KERNEL_PATTERNS: count_primes_segmented, matmul_blocked | 余りは 64 バイト単位
+
+-- android/app/build/intermediates の下の arm64-v8a/libmobilebench_jni.so
+  android/app/build/intermediates/cxx/Debug/p4e3b5x1/obj/arm64-v8a/libmobilebench_jni.so: sha256 80b255c7bf354a4dedb5376ee2096406787bd9d47cfa604613ec2a7df248e978 .symtab あり
+  android/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libmobilebench_jni.so: sha256 80b255c7bf354a4dedb5376ee2096406787bd9d47cfa604613ec2a7df248e978 .symtab あり
+  android/app/build/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/arm64-v8a/libmobilebench_jni.so: sha256 e5c714d45b2be8687d41d2a693fa273a991fed095fa93657177e52749332f8aa .symtab なし
+
+-- .so
+使った .so (android/app/build/intermediates/cxx/Debug/p4e3b5x1/obj/arm64-v8a/libmobilebench_jni.so): file sha256 80b255c7bf354a4dedb5376ee2096406787bd9d47cfa604613ec2a7df248e978 size 5982256 | build-id faab2f3db6896bc6b2b250eb3b5e45c2bbd7d6f2 | .text addr 0x42c20 offset 0x42c20 size 0x723f8 sha256 271c57539fa978487b730e737811a8b26470f99ad63f2f74c6ec22acc5e84f5d | .symtab あり
+APK の lib/arm64-v8a/libmobilebench_jni.so (app-debug.apk): file sha256 e5c714d45b2be8687d41d2a693fa273a991fed095fa93657177e52749332f8aa size 771560 | build-id faab2f3db6896bc6b2b250eb3b5e45c2bbd7d6f2 | .text addr 0x42c20 offset 0x42c20 size 0x723f8 sha256 271c57539fa978487b730e737811a8b26470f99ad63f2f74c6ec22acc5e84f5d | .symtab なし
+  -> .text の中身: 同じ / .text のアドレス: 同じ / ファイル全体: 違う(使った .so と比べて)
+  カーネルの関数の動的シンボル (2 個):
+    addr 0x6ccc0 (mod 64 = 0) size 952 mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+    addr 0x6e3a8 (mod 64 = 40) size 1812 mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+実機で使った APK (Android の実行 42952127373 = build 12) (MobileBench-debug-b12-8145938.apk の lib/arm64-v8a/libmobilebench_jni.so): file sha256 e5c714d45b2be8687d41d2a693fa273a991fed095fa93657177e52749332f8aa size 771560 | build-id faab2f3db6896bc6b2b250eb3b5e45c2bbd7d6f2 | .text addr 0x42c20 offset 0x42c20 size 0x723f8 sha256 271c57539fa978487b730e737811a8b26470f99ad63f2f74c6ec22acc5e84f5d | .symtab なし
+  -> .text の中身: 同じ / .text のアドレス: 同じ / ファイル全体: 違う(使った .so と比べて)
+  カーネルの関数の動的シンボル (2 個):
+    addr 0x6ccc0 (mod 64 = 0) size 952 mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+    addr 0x6e3a8 (mod 64 = 40) size 1812 mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+  -> このビルドの APK の .so とファイル全体が: 同じ
+
+-- カーネルの関数 (2 個)
+mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+  addr 0x6ccc0 (mod 64 = 0) size 952 (0x3b8) end 0x6d078
+  後ろ向きの分岐 11 個 (飛び先 / mod 64 / 分岐の位置 / 命令 / ループの長さ):
+    0x6cd48 /  8 / 0x6cddc / b.le / 152 バイト
+    0x6cdb8 / 56 / 0x6ce9c / b.le / 232 バイト
+    0x6ce60 / 32 / 0x6cef8 / b.le / 156 バイト
+    0x6ce60 / 32 / 0x6cf88 / b.ge / 300 バイト
+    0x6cf74 / 52 / 0x6cf90 / b.le / 32 バイト
+    0x6cf74 / 52 / 0x6cfd4 / b.ge / 100 バイト
+    0x6cfc4 /  4 / 0x6cfdc / b.le / 28 バイト
+    0x6cfc4 /  4 / 0x6d030 / b.eq / 112 バイト
+    0x6cfc4 /  4 / 0x6d054 / b / 148 バイト
+    0x6d004 /  4 / 0x6d024 / b.ne / 36 バイト
+    0x6d034 / 52 / 0x6d050 / b.lt / 32 バイト
+  この関数を bl / b で呼ぶ箇所(先頭か PLT へ飛ぶもの) 0 個: なし
+    (この .so の中に、この関数の先頭や PLT へ飛ぶ bl / b はない。関数ポインタでの呼び出しは数えていない)
+mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+  addr 0x6e3a8 (mod 64 = 40) size 1812 (0x714) end 0x6eabc
+  後ろ向きの分岐 21 個 (飛び先 / mod 64 / 分岐の位置 / 命令 / ループの長さ):
+    0x6e414 / 20 / 0x6e420 / b.hi / 16 バイト
+    0x6e428 / 40 / 0x6e438 / b.ls / 20 バイト
+    0x6e47c / 60 / 0x6e764 / b.hi / 748 バイト
+    0x6e4f4 / 52 / 0x6e5dc / cbz / 236 バイト
+    0x6e4fc / 60 / 0x6e6b0 / b.eq / 440 バイト
+    0x6e4fc / 60 / 0x6e700 / b.eq / 520 バイト
+    0x6e4fc / 60 / 0x6e71c / b / 548 バイト
+    0x6e580 /  0 / 0x6e598 / b.ls / 28 バイト
+    0x6e580 /  0 / 0x6e5b0 / b / 52 バイト
+    0x6e5a0 / 32 / 0x6e5ac / b.lo / 16 バイト
+    0x6e648 /  8 / 0x6e684 / b.ne / 64 バイト
+    0x6e6d8 / 24 / 0x6e6ec / b.ne / 24 バイト
+    0x6e708 /  8 / 0x6e718 / b.lo / 20 バイト
+    0x6e75c / 28 / 0x6e770 / cbz / 24 バイト
+    0x6e75c / 28 / 0x6e9c0 / b.hi / 616 バイト
+    0x6e75c / 28 / 0x6e9d8 / b / 640 バイト
+    0x6e834 / 52 / 0x6e848 / b.ne / 24 バイト
+    0x6e860 / 32 / 0x6e86c / b.ne / 16 バイト
+    0x6e95c / 28 / 0x6e970 / b.ne / 24 バイト
+    0x6e988 /  8 / 0x6e994 / b.ne / 16 バイト
+    0x6e9c4 /  4 / 0x6e9d4 / b.ls / 20 バイト
+  この関数を bl / b で呼ぶ箇所(先頭か PLT へ飛ぶもの) 1 個:
+    0x6f604 bl (PLT) in mb::detail::SieveKernel::run_unit(int)
+
+-- 逆アセンブル
+0x6ccc0 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)>:
+   6ccc0:      	sub	sp, sp, #0x150
+   6ccc4:      	stp	x29, x30, [sp, #0xf0]
+   6ccc8:      	stp	x28, x27, [sp, #0x100]
+   6cccc:      	stp	x26, x25, [sp, #0x110]
+   6ccd0:      	stp	x24, x23, [sp, #0x120]
+   6ccd4:      	stp	x22, x21, [sp, #0x130]
+   6ccd8:      	stp	x20, x19, [sp, #0x140]
+   6ccdc:      	str	x2, [sp, #0x18]
+   6cce0:      	str	x1, [sp, #0x40]
+   6cce4:      	cmp	w3, #0x1
+   6cce8:      	str	x0, [sp, #0x98]
+   6ccec:      	b.lt	0x6d058 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x398>
+   6ccf0:      	sxtw	x17, w4
+   6ccf4:      	mov	w11, w3
+   6ccf8:      	sbfiz	x9, x4, #3, #32
+   6ccfc:      	mov	x10, xzr
+   6cd00:      	mov	x12, xzr
+   6cd04:      	ubfiz	x14, x3, #3, #32
+   6cd08:      	mul	x8, x17, x11
+   6cd0c:      	stp	x9, x17, [sp, #0xa0]
+   6cd10:      	ldr	x9, [sp, #0x40]
+   6cd14:      	str	x4, [sp, #0x90]
+   6cd18:      	str	x3, [sp, #0xb0]
+   6cd1c:      	lsl	x13, x8, #3
+   6cd20:      	add	x8, x9, #0x8
+   6cd24:      	add	x9, x9, #0x10
+   6cd28:      	stp	x8, x13, [sp, #0x30]
+   6cd2c:      	ldr	x8, [sp, #0x18]
+   6cd30:      	add	x15, x8, #0x8
+   6cd34:      	str	x8, [sp, #0x78]
+   6cd38:      	stp	x9, x15, [sp, #0x8]
+   6cd3c:      	add	x9, x8, #0x10
+   6cd40:      	str	x9, [sp, #0x48]
+   6cd44:      	b	0x6cd70 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0xb0>
+   6cd48:      	ldr	x8, [sp, #0x48]
+   6cd4c:      	ldp	x12, x10, [sp, #0x20]
+   6cd50:      	add	x8, x8, x13
+   6cd54:      	str	x8, [sp, #0x48]
+   6cd58:      	ldr	x8, [sp, #0x78]
+   6cd5c:      	cmp	w3, w12
+   6cd60:      	add	x10, x10, #0x1
+   6cd64:      	add	x8, x8, x13
+   6cd68:      	str	x8, [sp, #0x78]
+   6cd6c:      	b.le	0x6d058 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x398>
+   6cd70:      	mul	x8, x13, x10
+   6cd74:      	add	x9, x12, x17
+   6cd78:      	mov	x15, xzr
+   6cd7c:      	cmp	w3, w9
+   6cd80:      	stp	x9, x10, [sp, #0x20]
+   6cd84:      	mov	x0, xzr
+   6cd88:      	csel	w9, w3, w9, lt
+   6cd8c:      	str	x12, [sp, #0xb8]
+   6cd90:      	sxtw	x21, w9
+   6cd94:      	ldr	x9, [sp, #0x18]
+   6cd98:      	add	x9, x9, x8
+   6cd9c:      	str	x9, [sp, #0x70]
+   6cda0:      	ldp	x1, x9, [sp, #0x8]
+   6cda4:      	add	x8, x9, x8
+   6cda8:      	str	x8, [sp, #0x68]
+   6cdac:      	ldr	x8, [sp, #0x40]
+   6cdb0:      	str	x8, [sp, #0xe8]
+   6cdb4:      	b	0x6cde0 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x120>
+   6cdb8:      	ldp	x0, x15, [sp, #0x58]
+   6cdbc:      	ldr	x13, [sp, #0x38]
+   6cdc0:      	ldr	x1, [sp, #0x50]
+   6cdc4:      	ldr	x8, [sp, #0xe8]
+   6cdc8:      	cmp	w3, w0
+   6cdcc:      	add	x15, x15, #0x1
+   6cdd0:      	add	x1, x1, x13
+   6cdd4:      	add	x8, x8, x13
+   6cdd8:      	str	x8, [sp, #0xe8]
+   6cddc:      	b.le	0x6cd48 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x88>
+   6cde0:      	madd	w8, w4, w15, w4
+   6cde4:      	add	x12, x0, #0x1
+   6cde8:      	str	xzr, [sp, #0xe0]
+   6cdec:      	mul	x9, x15, x17
+   6cdf0:      	mov	x2, xzr
+   6cdf4:      	mov	x29, xzr
+   6cdf8:      	str	x1, [sp, #0x50]
+   6cdfc:      	sxtw	x8, w8
+   6ce00:      	mul	x10, x13, x15
+   6ce04:      	cmp	x11, x8
+   6ce08:      	csel	x8, x11, x8, lt
+   6ce0c:      	mvn	x9, x9
+   6ce10:      	cmp	x8, x12
+   6ce14:      	add	x12, x0, x17
+   6ce18:      	csinc	x8, x8, x0, gt
+   6ce1c:      	cmp	w3, w12
+   6ce20:      	stp	x12, x15, [sp, #0x58]
+   6ce24:      	add	x8, x8, x9
+   6ce28:      	ldr	x9, [sp, #0x30]
+   6ce2c:      	add	x9, x9, x10
+   6ce30:      	madd	x8, x14, x8, x9
+   6ce34:      	str	x8, [sp, #0x88]
+   6ce38:      	csel	w8, w3, w12, lt
+   6ce3c:      	mov	w12, w4
+   6ce40:      	sxtw	x16, w8
+   6ce44:      	ldr	x8, [sp, #0x40]
+   6ce48:      	add	x8, x8, x10
+   6ce4c:      	str	x8, [sp, #0x80]
+   6ce50:      	ldr	x8, [sp, #0x48]
+   6ce54:      	str	x8, [sp, #0xd8]
+   6ce58:      	mov	w8, #0x1                // =1
+   6ce5c:      	b	0x6cea0 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1e0>
+   6ce60:      	ldp	x17, x3, [sp, #0xa8]
+   6ce64:      	ldr	x4, [sp, #0x90]
+   6ce68:      	ldp	x10, x9, [sp, #0xd8]
+   6ce6c:      	ldr	x12, [sp, #0xc0]
+   6ce70:      	ldp	x29, x2, [sp, #0xc8]
+   6ce74:      	add	w12, w12, w4
+   6ce78:      	add	x8, x8, x17
+   6ce7c:      	sub	x9, x9, x17
+   6ce80:      	str	x9, [sp, #0xe0]
+   6ce84:      	ldr	x9, [sp, #0xa0]
+   6ce88:      	add	x2, x2, #0x1
+   6ce8c:      	cmp	w3, w29
+   6ce90:      	add	x1, x1, x9
+   6ce94:      	add	x10, x10, x9
+   6ce98:      	str	x10, [sp, #0xd8]
+   6ce9c:      	b.le	0x6cdb8 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0xf8>
+   6cea0:      	sxtw	x9, w12
+   6cea4:      	madd	w10, w4, w2, w4
+   6cea8:      	str	x12, [sp, #0xc0]
+   6ceac:      	add	x15, x29, #0x1
+   6ceb0:      	ldr	x4, [sp, #0x98]
+   6ceb4:      	cmp	x9, x11
+   6ceb8:      	csel	x9, x9, x11, lt
+   6cebc:      	sxtw	x12, w10
+   6cec0:      	cmp	x9, x8
+   6cec4:      	csel	x13, x9, x8, gt
+   6cec8:      	cmp	x11, x12
+   6cecc:      	csel	x9, x11, x12, lt
+   6ced0:      	cmp	x9, x15
+   6ced4:      	csinc	x10, x9, x29, gt
+   6ced8:      	cmp	x11, x12
+   6cedc:      	csel	x9, x11, x12, lt
+   6cee0:      	cmp	x9, x15
+   6cee4:      	csinc	x12, x9, x29, gt
+   6cee8:      	ldr	x9, [sp, #0xb8]
+   6ceec:      	cmp	w21, w9
+   6cef0:      	add	x9, x29, x17
+   6cef4:      	stp	x9, x2, [sp, #0xc8]
+   6cef8:      	b.le	0x6ce60 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1a0>
+   6cefc:      	ldp	x17, x15, [sp, #0xa0]
+   6cf00:      	mov	x9, xzr
+   6cf04:      	ldp	x3, x2, [sp, #0xc8]
+   6cf08:      	ldr	x19, [sp, #0x78]
+   6cf0c:      	mul	x15, x2, x15
+   6cf10:      	mul	x17, x17, x2
+   6cf14:      	ldr	x2, [sp, #0xe0]
+   6cf18:      	add	x13, x13, x2
+   6cf1c:      	ldr	x2, [sp, #0xb0]
+   6cf20:      	and	x27, x13, #0xfffffffffffffffc
+   6cf24:      	cmp	w2, w3
+   6cf28:      	csel	w13, w2, w3, lt
+   6cf2c:      	mvn	x3, x15
+   6cf30:      	sub	x2, x10, x15
+   6cf34:      	sxtw	x20, w13
+   6cf38:      	add	x10, x12, x3
+   6cf3c:      	and	x22, x2, #0xfffffffffffffffc
+   6cf40:      	ldp	x13, x12, [sp, #0x80]
+   6cf44:      	lsl	x10, x10, #3
+   6cf48:      	add	x23, x29, x22
+   6cf4c:      	add	x7, x13, x17
+   6cf50:      	ldp	x13, x15, [sp, #0x68]
+   6cf54:      	add	x12, x12, x17
+   6cf58:      	add	x30, x12, x10
+   6cf5c:      	ldr	x12, [sp, #0xb8]
+   6cf60:      	add	x6, x15, x17
+   6cf64:      	add	x13, x13, x17
+   6cf68:      	ldr	x15, [sp, #0xd8]
+   6cf6c:      	add	x17, x13, x10
+   6cf70:      	b	0x6cf8c <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2cc>
+   6cf74:      	add	x12, x12, #0x1
+   6cf78:      	add	x9, x9, #0x1
+   6cf7c:      	add	x15, x15, x14
+   6cf80:      	cmp	x12, x21
+   6cf84:      	add	x19, x19, x14
+   6cf88:      	b.ge	0x6ce60 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1a0>
+   6cf8c:      	cmp	w16, w0
+   6cf90:      	b.le	0x6cf74 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2b4>
+   6cf94:      	mul	x10, x14, x9
+   6cf98:      	ldr	x24, [sp, #0xe8]
+   6cf9c:      	mov	x26, x1
+   6cfa0:      	mov	x28, x0
+   6cfa4:      	mul	x13, x12, x11
+   6cfa8:      	add	x3, x6, x10
+   6cfac:      	add	x10, x17, x10
+   6cfb0:      	cmp	x3, x30
+   6cfb4:      	ccmp	x7, x10, #0x2, lo
+   6cfb8:      	add	x3, x4, x13, lsl #3
+   6cfbc:      	cset	w10, lo
+   6cfc0:      	b	0x6cfd8 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x318>
+   6cfc4:      	add	x28, x28, #0x1
+   6cfc8:      	add	x26, x26, x14
+   6cfcc:      	add	x24, x24, x14
+   6cfd0:      	cmp	x28, x16
+   6cfd4:      	b.ge	0x6cf74 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2b4>
+   6cfd8:      	cmp	w20, w29
+   6cfdc:      	b.le	0x6cfc4 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   6cfe0:      	cmp	x2, #0x4
+   6cfe4:      	ldr	d0, [x3, x28, lsl #3]
+   6cfe8:      	mov	x13, x29
+   6cfec:      	csinc	w5, w10, wzr, hs
+   6cff0:      	tbnz	w5, #0x0, 0x6d034 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x374>
+   6cff4:      	dup	v1.2d, v0.d[0]
+   6cff8:      	mov	x5, x15
+   6cffc:      	mov	x25, x26
+   6d000:      	mov	x13, x27
+   6d004:      	ldp	q2, q4, [x25, #-0x10]
+   6d008:      	subs	x13, x13, #0x4
+   6d00c:      	ldp	q3, q5, [x5, #-0x10]
+   6d010:      	add	x25, x25, #0x20
+   6d014:      	fmla	v3.2d, v2.2d, v1.2d
+   6d018:      	fmla	v5.2d, v4.2d, v1.2d
+   6d01c:      	stp	q3, q5, [x5, #-0x10]
+   6d020:      	add	x5, x5, #0x20
+   6d024:      	b.ne	0x6d004 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x344>
+   6d028:      	cmp	x2, x22
+   6d02c:      	mov	x13, x23
+   6d030:      	b.eq	0x6cfc4 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   6d034:      	lsl	x5, x13, #3
+   6d038:      	add	x13, x13, #0x1
+   6d03c:      	cmp	x13, x20
+   6d040:      	ldr	d1, [x24, x5]
+   6d044:      	ldr	d2, [x19, x5]
+   6d048:      	fmadd	d1, d0, d1, d2
+   6d04c:      	str	d1, [x19, x5]
+   6d050:      	b.lt	0x6d034 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x374>
+   6d054:      	b	0x6cfc4 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   6d058:      	ldp	x20, x19, [sp, #0x140]
+   6d05c:      	ldp	x22, x21, [sp, #0x130]
+   6d060:      	ldp	x24, x23, [sp, #0x120]
+   6d064:      	ldp	x26, x25, [sp, #0x110]
+   6d068:      	ldp	x28, x27, [sp, #0x100]
+   6d06c:      	ldp	x29, x30, [sp, #0xf0]
+   6d070:      	add	sp, sp, #0x150
+   6d074:      	ret
+
+0x6e3a8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)>:
+   6e3a8:      	sub	sp, sp, #0xd0
+   6e3ac:      	stp	x29, x30, [sp, #0x70]
+   6e3b0:      	stp	x28, x27, [sp, #0x80]
+   6e3b4:      	stp	x26, x25, [sp, #0x90]
+   6e3b8:      	stp	x24, x23, [sp, #0xa0]
+   6e3bc:      	stp	x22, x21, [sp, #0xb0]
+   6e3c0:      	stp	x20, x19, [sp, #0xc0]
+   6e3c4:      	add	x29, sp, #0x70
+   6e3c8:      	mrs	x10, TPIDR_EL0
+   6e3cc:      	ldr	x8, [x10, #0x28]
+   6e3d0:      	stur	x8, [x29, #-0x8]
+   6e3d4:      	mov	w8, #-0x7fffffff        // =-2147483647
+   6e3d8:      	cmp	w0, w8
+   6e3dc:      	stur	w1, [x29, #-0x34]
+   6e3e0:      	b.hs	0x6ea2c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x684>
+   6e3e4:      	cmp	w0, #0x3
+   6e3e8:      	b.hs	0x6e3f4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4c>
+   6e3ec:      	mov	x0, xzr
+   6e3f0:      	b	0x6e724 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x37c>
+   6e3f4:      	ldur	w8, [x29, #-0x34]
+   6e3f8:      	cbz	w8, 0x6ea4c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6a4>
+   6e3fc:      	sub	w8, w0, #0x1
+   6e400:      	mov	x21, x2
+   6e404:      	stur	w0, [x29, #-0x1c]
+   6e408:      	ucvtf	d0, w8
+   6e40c:      	fsqrt	d0, d0
+   6e410:      	fcvtzu	x26, d0
+   6e414:      	mul	x9, x26, x26
+   6e418:      	sub	x26, x26, #0x1
+   6e41c:      	cmp	x9, x8
+   6e420:      	b.hi	0x6e414 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6c>
+   6e424:      	str	x10, [sp]
+   6e428:      	add	x9, x26, #0x2
+   6e42c:      	add	x26, x26, #0x1
+   6e430:      	mul	x9, x9, x9
+   6e434:      	cmp	x9, x8
+   6e438:      	b.ls	0x6e428 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x80>
+   6e43c:      	and	x9, x26, #0xffffffff
+   6e440:      	mov	w8, #0x1                // =1
+   6e444:      	add	x0, x21, #0x18
+   6e448:      	add	x1, x9, #0x1
+   6e44c:      	sub	x2, x29, #0xc
+   6e450:      	sturb	w8, [x29, #-0xc]
+   6e454:      	bl	0x6eaec <std::__ndk1::vector<unsigned char, std::__ndk1::allocator<unsigned char>>::assign(unsigned long, unsigned char const&)>
+   6e458:      	mov	x22, x21
+   6e45c:      	cmp	w26, #0x2
+   6e460:      	ldr	x8, [x22, #0x30]!
+   6e464:      	mov	x10, x22
+   6e468:      	ldr	x9, [x10, #0x18]!
+   6e46c:      	stur	x10, [x29, #-0x18]
+   6e470:      	str	x8, [x22, #0x8]
+   6e474:      	str	x9, [x22, #0x20]
+   6e478:      	b.hs	0x6e754 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3ac>
+   6e47c:      	ldp	x19, x8, [x21]
+   6e480:      	ldur	w9, [x29, #-0x34]
+   6e484:      	mov	w23, w9
+   6e488:      	sub	x8, x8, x19
+   6e48c:      	subs	x1, x23, x8
+   6e490:      	b.ls	0x6e4a0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0xf8>
+   6e494:      	mov	x0, x21
+   6e498:      	bl	0x6f778 <std::__ndk1::vector<unsigned char, std::__ndk1::allocator<unsigned char>>::__append(unsigned long)>
+   6e49c:      	ldr	x19, [x21]
+   6e4a0:      	ldp	x28, x8, [x21, #0x30]
+   6e4a4:      	neg	x10, x23
+   6e4a8:      	ldur	w9, [x29, #-0x1c]
+   6e4ac:      	ldr	x21, [x21, #0x48]
+   6e4b0:      	mov	w13, wzr
+   6e4b4:      	mov	x26, xzr
+   6e4b8:      	mov	x20, xzr
+   6e4bc:      	mov	x0, xzr
+   6e4c0:      	str	x8, [sp, #0x20]
+   6e4c4:      	sub	x8, x8, x28
+   6e4c8:      	mov	w9, w9
+   6e4cc:      	asr	x8, x8, #2
+   6e4d0:      	stp	x10, x9, [sp, #0x10]
+   6e4d4:      	add	x10, x19, #0x10
+   6e4d8:      	mov	x24, x23
+   6e4dc:      	mov	x22, x19
+   6e4e0:      	str	x10, [sp, #0x8]
+   6e4e4:      	cmp	x8, #0x1
+   6e4e8:      	str	x23, [sp, #0x30]
+   6e4ec:      	csinc	x27, x8, xzr, hi
+   6e4f0:      	b	0x6e524 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x17c>
+   6e4f4:      	ldr	x23, [sp, #0x30]
+   6e4f8:      	mov	w11, wzr
+   6e4fc:      	ldp	x8, x9, [sp, #0x10]
+   6e500:      	add	x0, x0, w11, uxtw
+   6e504:      	ldur	x20, [x29, #-0x28]
+   6e508:      	add	x26, x26, #0x1
+   6e50c:      	add	x24, x24, x23
+   6e510:      	add	x22, x22, x8
+   6e514:      	ldur	w8, [x29, #-0x34]
+   6e518:      	cmp	x20, x9
+   6e51c:      	sub	w13, w13, w8
+   6e520:      	b.hs	0x6e720 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x378>
+   6e524:      	cmp	x24, x9
+   6e528:      	add	x8, x20, x23
+   6e52c:      	stur	x0, [x29, #-0x18]
+   6e530:      	csel	x10, x24, x9, lo
+   6e534:      	cmp	x8, x9
+   6e538:      	stur	x8, [x29, #-0x28]
+   6e53c:      	csel	x23, x8, x9, lo
+   6e540:      	mov	w8, #0x2                // =2
+   6e544:      	mov	x0, x19
+   6e548:      	cmp	x23, #0x2
+   6e54c:      	mov	w1, #0x1                // =1
+   6e550:      	stur	w13, [x29, #-0x1c]
+   6e554:      	csel	x25, x23, x8, lo
+   6e558:      	sub	x8, x23, x20
+   6e55c:      	str	x10, [sp, #0x28]
+   6e560:      	and	x2, x8, #0xffffffff
+   6e564:      	stur	x8, [x29, #-0x30]
+   6e568:      	bl	0xb5ab0 <memset@plt>
+   6e56c:      	ldr	x8, [sp, #0x20]
+   6e570:      	cmp	x8, x28
+   6e574:      	b.eq	0x6e5b4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x20c>
+   6e578:      	mov	x8, xzr
+   6e57c:      	b	0x6e590 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1e8>
+   6e580:      	str	w9, [x21, x8, lsl #2]
+   6e584:      	add	x8, x8, #0x1
+   6e588:      	cmp	x8, x27
+   6e58c:      	b.eq	0x6e5b4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x20c>
+   6e590:      	ldr	w9, [x21, x8, lsl #2]
+   6e594:      	cmp	x23, x9
+   6e598:      	b.ls	0x6e580 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1d8>
+   6e59c:      	ldr	w10, [x28, x8, lsl #2]
+   6e5a0:      	strb	wzr, [x22, x9]
+   6e5a4:      	add	x9, x9, x10
+   6e5a8:      	cmp	x9, x23
+   6e5ac:      	b.lo	0x6e5a0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1f8>
+   6e5b0:      	b	0x6e580 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1d8>
+   6e5b4:      	cmp	x20, x25
+   6e5b8:      	b.hs	0x6e5d0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x228>
+   6e5bc:      	ldr	x8, [sp, #0x30]
+   6e5c0:      	mov	x0, x19
+   6e5c4:      	mov	w1, wzr
+   6e5c8:      	msub	x2, x26, x8, x25
+   6e5cc:      	bl	0xb5ab0 <memset@plt>
+   6e5d0:      	ldur	x0, [x29, #-0x18]
+   6e5d4:      	ldur	w13, [x29, #-0x1c]
+   6e5d8:      	ldur	x14, [x29, #-0x30]
+   6e5dc:      	cbz	w14, 0x6e4f4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x14c>
+   6e5e0:      	ldur	w8, [x29, #-0x34]
+   6e5e4:      	msub	w8, w8, w26, w23
+   6e5e8:      	cmp	w8, #0x8
+   6e5ec:      	b.hs	0x6e600 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x258>
+   6e5f0:      	ldr	x23, [sp, #0x30]
+   6e5f4:      	mov	x9, xzr
+   6e5f8:      	mov	w11, wzr
+   6e5fc:      	b	0x6e704 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x35c>
+   6e600:      	ldp	x9, x23, [sp, #0x28]
+   6e604:      	cmp	w8, #0x20
+   6e608:      	add	w10, w13, w9
+   6e60c:      	b.hs	0x6e61c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x274>
+   6e610:      	mov	w11, wzr
+   6e614:      	mov	x9, xzr
+   6e618:      	b	0x6e6bc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x314>
+   6e61c:      	movi	v0.2d, #0000000000000000
+   6e620:      	movi	v2.2d, #0000000000000000
+   6e624:      	ldr	x12, [sp, #0x8]
+   6e628:      	movi	v1.2d, #0000000000000000
+   6e62c:      	movi	v3.2d, #0000000000000000
+   6e630:      	and	x11, x10, #0xffffffe0
+   6e634:      	movi	v4.2d, #0000000000000000
+   6e638:      	movi	v6.2d, #0000000000000000
+   6e63c:      	and	x9, x8, #0xffffffe0
+   6e640:      	movi	v5.2d, #0000000000000000
+   6e644:      	movi	v7.2d, #0000000000000000
+   6e648:      	ldp	q16, q17, [x12, #-0x10]
+   6e64c:      	subs	x11, x11, #0x20
+   6e650:      	add	x12, x12, #0x20
+   6e654:      	ushll2	v18.8h, v16.16b, #0x0
+   6e658:      	ushll	v16.8h, v16.8b, #0x0
+   6e65c:      	ushll2	v19.8h, v17.16b, #0x0
+   6e660:      	ushll	v17.8h, v17.8b, #0x0
+   6e664:      	uaddw2	v3.4s, v3.4s, v18.8h
+   6e668:      	uaddw	v1.4s, v1.4s, v18.4h
+   6e66c:      	uaddw2	v2.4s, v2.4s, v16.8h
+   6e670:      	uaddw	v0.4s, v0.4s, v16.4h
+   6e674:      	uaddw2	v7.4s, v7.4s, v19.8h
+   6e678:      	uaddw	v5.4s, v5.4s, v19.4h
+   6e67c:      	uaddw2	v6.4s, v6.4s, v17.8h
+   6e680:      	uaddw	v4.4s, v4.4s, v17.4h
+   6e684:      	b.ne	0x6e648 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x2a0>
+   6e688:      	add	v2.4s, v6.4s, v2.4s
+   6e68c:      	add	v3.4s, v7.4s, v3.4s
+   6e690:      	cmp	x9, x8
+   6e694:      	add	v0.4s, v4.4s, v0.4s
+   6e698:      	add	v1.4s, v5.4s, v1.4s
+   6e69c:      	add	v0.4s, v0.4s, v1.4s
+   6e6a0:      	add	v1.4s, v2.4s, v3.4s
+   6e6a4:      	add	v0.4s, v0.4s, v1.4s
+   6e6a8:      	addv	s0, v0.4s
+   6e6ac:      	fmov	w11, s0
+   6e6b0:      	b.eq	0x6e4fc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   6e6b4:      	tst	x8, #0x18
+   6e6b8:      	b.eq	0x6e704 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x35c>
+   6e6bc:      	movi	v0.2d, #0000000000000000
+   6e6c0:      	movi	v1.2d, #0000000000000000
+   6e6c4:      	mov	v0.s[0], w11
+   6e6c8:      	and	x11, x10, #0xfffffff8
+   6e6cc:      	add	x10, x19, x9
+   6e6d0:      	sub	x11, x9, x11
+   6e6d4:      	and	x9, x8, #0xfffffff8
+   6e6d8:      	ldr	d2, [x10], #0x8
+   6e6dc:      	adds	x11, x11, #0x8
+   6e6e0:      	ushll	v2.8h, v2.8b, #0x0
+   6e6e4:      	uaddw2	v1.4s, v1.4s, v2.8h
+   6e6e8:      	uaddw	v0.4s, v0.4s, v2.4h
+   6e6ec:      	b.ne	0x6e6d8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x330>
+   6e6f0:      	add	v0.4s, v0.4s, v1.4s
+   6e6f4:      	cmp	x9, x8
+   6e6f8:      	addv	s0, v0.4s
+   6e6fc:      	fmov	w11, s0
+   6e700:      	b.eq	0x6e4fc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   6e704:      	and	x8, x14, #0xffffffff
+   6e708:      	ldrb	w10, [x19, x9]
+   6e70c:      	add	x9, x9, #0x1
+   6e710:      	cmp	x9, x8
+   6e714:      	add	w11, w11, w10
+   6e718:      	b.lo	0x6e708 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x360>
+   6e71c:      	b	0x6e4fc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   6e720:      	ldr	x10, [sp]
+   6e724:      	ldr	x8, [x10, #0x28]
+   6e728:      	ldur	x9, [x29, #-0x8]
+   6e72c:      	cmp	x8, x9
+   6e730:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6e734:      	ldp	x20, x19, [sp, #0xc0]
+   6e738:      	ldp	x22, x21, [sp, #0xb0]
+   6e73c:      	ldp	x24, x23, [sp, #0xa0]
+   6e740:      	ldp	x26, x25, [sp, #0x90]
+   6e744:      	ldp	x28, x27, [sp, #0x80]
+   6e748:      	ldp	x29, x30, [sp, #0x70]
+   6e74c:      	add	sp, sp, #0xd0
+   6e750:      	ret
+   6e754:      	mov	w27, #0x2               // =2
+   6e758:      	b	0x6e768 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3c0>
+   6e75c:      	add	w27, w27, #0x1
+   6e760:      	cmp	w27, w26
+   6e764:      	b.hi	0x6e47c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0xd4>
+   6e768:      	ldur	x8, [x21, #0x18]
+   6e76c:      	ldrb	w8, [x8, w27, uxtw]
+   6e770:      	cbz	w8, 0x6e75c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   6e774:      	ldp	x23, x8, [x21, #0x38]
+   6e778:      	cmp	x23, x8
+   6e77c:      	b.hs	0x6e78c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3e4>
+   6e780:      	str	w27, [x23], #0x4
+   6e784:      	mov	x28, x23
+   6e788:      	b	0x6e890 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4e8>
+   6e78c:      	ldr	x24, [x22]
+   6e790:      	sub	x20, x23, x24
+   6e794:      	asr	x25, x20, #2
+   6e798:      	add	x9, x25, #0x1
+   6e79c:      	lsr	x10, x9, #62
+   6e7a0:      	cbnz	x10, 0x6ea10 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x668>
+   6e7a4:      	sub	x8, x8, x24
+   6e7a8:      	asr	x10, x8, #1
+   6e7ac:      	cmp	x10, x9
+   6e7b0:      	csel	x9, x10, x9, hi
+   6e7b4:      	mov	x10, #0x7ffffffffffffffc // =9223372036854775804
+   6e7b8:      	cmp	x8, x10
+   6e7bc:      	mov	x8, #0x3fffffffffffffff // =4611686018427387903
+   6e7c0:      	csel	x19, x9, x8, lo
+   6e7c4:      	cbz	x19, 0x6e7dc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x434>
+   6e7c8:      	lsr	x8, x19, #62
+   6e7cc:      	cbnz	x8, 0x6e9dc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x634>
+   6e7d0:      	lsl	x0, x19, #2
+   6e7d4:      	bl	0xb50c0 <_Znwm@plt>
+   6e7d8:      	b	0x6e7e0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x438>
+   6e7dc:      	mov	x0, xzr
+   6e7e0:      	add	x9, x0, x25, lsl #2
+   6e7e4:      	subs	x8, x23, x24
+   6e7e8:      	mov	x28, x9
+   6e7ec:      	str	w27, [x28], #0x4
+   6e7f0:      	b.eq	0x6e874 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4cc>
+   6e7f4:      	sub	x8, x8, #0x4
+   6e7f8:      	cmp	x8, #0x1c
+   6e7fc:      	b.lo	0x6e85c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b4>
+   6e800:      	sub	x10, x23, x0
+   6e804:      	sub	x10, x10, x20
+   6e808:      	cmp	x10, #0x20
+   6e80c:      	b.lo	0x6e85c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b4>
+   6e810:      	lsr	x8, x8, #2
+   6e814:      	sub	x13, x23, #0x10
+   6e818:      	add	x10, x8, #0x1
+   6e81c:      	and	x11, x10, #0x7ffffffffffffff8
+   6e820:      	lsl	x8, x11, #2
+   6e824:      	mov	x14, x11
+   6e828:      	sub	x12, x23, x8
+   6e82c:      	sub	x8, x9, x8
+   6e830:      	sub	x9, x9, #0x10
+   6e834:      	ldp	q1, q0, [x13, #-0x10]
+   6e838:      	subs	x14, x14, #0x8
+   6e83c:      	sub	x13, x13, #0x20
+   6e840:      	stp	q1, q0, [x9, #-0x10]
+   6e844:      	sub	x9, x9, #0x20
+   6e848:      	b.ne	0x6e834 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x48c>
+   6e84c:      	cmp	x10, x11
+   6e850:      	mov	x23, x12
+   6e854:      	mov	x9, x8
+   6e858:      	b.eq	0x6e878 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4d0>
+   6e85c:      	mov	x8, x9
+   6e860:      	ldr	w9, [x23, #-0x4]!
+   6e864:      	cmp	x23, x24
+   6e868:      	str	w9, [x8, #-0x4]!
+   6e86c:      	b.ne	0x6e860 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b8>
+   6e870:      	b	0x6e878 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4d0>
+   6e874:      	mov	x8, x9
+   6e878:      	add	x9, x0, x19, lsl #2
+   6e87c:      	stp	x8, x28, [x21, #0x30]
+   6e880:      	str	x9, [x21, #0x40]
+   6e884:      	cbz	x24, 0x6e890 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4e8>
+   6e888:      	mov	x0, x24
+   6e88c:      	bl	0xb5100 <_ZdlPv@plt>
+   6e890:      	ldp	x25, x8, [x21, #0x50]
+   6e894:      	mul	w19, w27, w27
+   6e898:      	str	x28, [x21, #0x38]
+   6e89c:      	cmp	x25, x8
+   6e8a0:      	b.hs	0x6e8b0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x508>
+   6e8a4:      	str	w19, [x25], #0x4
+   6e8a8:      	mov	x23, x25
+   6e8ac:      	b	0x6e9b8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x610>
+   6e8b0:      	ldur	x9, [x29, #-0x18]
+   6e8b4:      	ldr	x24, [x9]
+   6e8b8:      	sub	x20, x25, x24
+   6e8bc:      	asr	x23, x20, #2
+   6e8c0:      	add	x9, x23, #0x1
+   6e8c4:      	lsr	x10, x9, #62
+   6e8c8:      	cbnz	x10, 0x6e9f4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x64c>
+   6e8cc:      	sub	x8, x8, x24
+   6e8d0:      	asr	x10, x8, #1
+   6e8d4:      	cmp	x10, x9
+   6e8d8:      	csel	x9, x10, x9, hi
+   6e8dc:      	mov	x10, #0x7ffffffffffffffc // =9223372036854775804
+   6e8e0:      	cmp	x8, x10
+   6e8e4:      	mov	x8, #0x3fffffffffffffff // =4611686018427387903
+   6e8e8:      	csel	x28, x9, x8, lo
+   6e8ec:      	cbz	x28, 0x6e904 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x55c>
+   6e8f0:      	lsr	x8, x28, #62
+   6e8f4:      	cbnz	x8, 0x6e9dc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x634>
+   6e8f8:      	lsl	x0, x28, #2
+   6e8fc:      	bl	0xb50c0 <_Znwm@plt>
+   6e900:      	b	0x6e908 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x560>
+   6e904:      	mov	x0, xzr
+   6e908:      	add	x9, x0, x23, lsl #2
+   6e90c:      	subs	x8, x25, x24
+   6e910:      	mov	x23, x9
+   6e914:      	str	w19, [x23], #0x4
+   6e918:      	b.eq	0x6e99c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f4>
+   6e91c:      	sub	x8, x8, #0x4
+   6e920:      	cmp	x8, #0x1c
+   6e924:      	b.lo	0x6e984 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5dc>
+   6e928:      	sub	x10, x25, x0
+   6e92c:      	sub	x10, x10, x20
+   6e930:      	cmp	x10, #0x20
+   6e934:      	b.lo	0x6e984 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5dc>
+   6e938:      	lsr	x8, x8, #2
+   6e93c:      	sub	x13, x25, #0x10
+   6e940:      	add	x10, x8, #0x1
+   6e944:      	and	x11, x10, #0x7ffffffffffffff8
+   6e948:      	lsl	x8, x11, #2
+   6e94c:      	mov	x14, x11
+   6e950:      	sub	x12, x25, x8
+   6e954:      	sub	x8, x9, x8
+   6e958:      	sub	x9, x9, #0x10
+   6e95c:      	ldp	q1, q0, [x13, #-0x10]
+   6e960:      	subs	x14, x14, #0x8
+   6e964:      	sub	x13, x13, #0x20
+   6e968:      	stp	q1, q0, [x9, #-0x10]
+   6e96c:      	sub	x9, x9, #0x20
+   6e970:      	b.ne	0x6e95c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5b4>
+   6e974:      	cmp	x10, x11
+   6e978:      	mov	x25, x12
+   6e97c:      	mov	x9, x8
+   6e980:      	b.eq	0x6e9a0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f8>
+   6e984:      	mov	x8, x9
+   6e988:      	ldr	w9, [x25, #-0x4]!
+   6e98c:      	cmp	x25, x24
+   6e990:      	str	w9, [x8, #-0x4]!
+   6e994:      	b.ne	0x6e988 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5e0>
+   6e998:      	b	0x6e9a0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f8>
+   6e99c:      	mov	x8, x9
+   6e9a0:      	add	x9, x0, x28, lsl #2
+   6e9a4:      	stp	x8, x23, [x21, #0x48]
+   6e9a8:      	str	x9, [x21, #0x58]
+   6e9ac:      	cbz	x24, 0x6e9b8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x610>
+   6e9b0:      	mov	x0, x24
+   6e9b4:      	bl	0xb5100 <_ZdlPv@plt>
+   6e9b8:      	cmp	w19, w26
+   6e9bc:      	str	x23, [x21, #0x50]
+   6e9c0:      	b.hi	0x6e75c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   6e9c4:      	ldur	x8, [x21, #0x18]
+   6e9c8:      	strb	wzr, [x8, w19, uxtw]
+   6e9cc:      	add	w19, w19, w27
+   6e9d0:      	cmp	w19, w26
+   6e9d4:      	b.ls	0x6e9c4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x61c>
+   6e9d8:      	b	0x6e75c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   6e9dc:      	ldr	x8, [sp]
+   6e9e0:      	ldr	x8, [x8, #0x28]
+   6e9e4:      	ldur	x9, [x29, #-0x8]
+   6e9e8:      	cmp	x8, x9
+   6e9ec:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6e9f0:      	bl	0x4697c <std::__throw_bad_array_new_length[abi:ne180000]()>
+   6e9f4:      	ldr	x8, [sp]
+   6e9f8:      	ldr	x8, [x8, #0x28]
+   6e9fc:      	ldur	x9, [x29, #-0x8]
+   6ea00:      	cmp	x8, x9
+   6ea04:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6ea08:      	ldur	x0, [x29, #-0x18]
+   6ea0c:      	bl	0x6f764 <std::__ndk1::vector<unsigned int, std::__ndk1::allocator<unsigned int>>::__throw_length_error[abi:ne180000]() const>
+   6ea10:      	ldr	x8, [sp]
+   6ea14:      	ldr	x8, [x8, #0x28]
+   6ea18:      	ldur	x9, [x29, #-0x8]
+   6ea1c:      	cmp	x8, x9
+   6ea20:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6ea24:      	mov	x0, x22
+   6ea28:      	bl	0x6f764 <std::__ndk1::vector<unsigned int, std::__ndk1::allocator<unsigned int>>::__throw_length_error[abi:ne180000]() const>
+   6ea2c:      	mov	w0, #0x10               // =16
+   6ea30:      	mov	x21, x10
+   6ea34:      	bl	0xb5410 <__cxa_allocate_exception@plt>
+   6ea38:      	mov	x19, x0
+   6ea3c:      	nop
+   6ea40:      	adr	x1, 0x27b99 <mb::detail::(anonymous namespace)::kBoostIdleMs+0x3169>
+   6ea44:      	bl	0x6eabc <std::invalid_argument::invalid_argument[abi:ne180000](char const*)>
+   6ea48:      	b	0x6ea68 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6c0>
+   6ea4c:      	mov	w0, #0x10               // =16
+   6ea50:      	mov	x21, x10
+   6ea54:      	bl	0xb5410 <__cxa_allocate_exception@plt>
+   6ea58:      	mov	x19, x0
+   6ea5c:      	adrp	x1, 0x26000 <mb::detail::(anonymous namespace)::kBoostIdleMs+0x15d0>
+   6ea60:      	add	x1, x1, #0x818
+   6ea64:      	bl	0x6eabc <std::invalid_argument::invalid_argument[abi:ne180000](char const*)>
+   6ea68:      	ldr	x8, [x21, #0x28]
+   6ea6c:      	ldur	x9, [x29, #-0x8]
+   6ea70:      	cmp	x8, x9
+   6ea74:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6ea78:      	adrp	x1, 0xbb000 <vtable for (anonymous namespace)::itanium_demangle::LocalName+0x10>
+   6ea7c:      	adrp	x2, 0xbb000 <vtable for (anonymous namespace)::itanium_demangle::LocalName+0x10>
+   6ea80:      	mov	x0, x19
+   6ea84:      	ldr	x1, [x1, #0xed8]
+   6ea88:      	ldr	x2, [x2, #0xee0]
+   6ea8c:      	bl	0xb5440 <__cxa_throw@plt>
+   6ea90:      	b	0x6ea94 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6ec>
+   6ea94:      	ldr	x8, [x21, #0x28]
+   6ea98:      	ldur	x9, [x29, #-0x8]
+   6ea9c:      	mov	x20, x0
+   6eaa0:      	cmp	x8, x9
+   6eaa4:      	b.ne	0x6eab8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   6eaa8:      	mov	x0, x19
+   6eaac:      	bl	0xb5b30 <__cxa_free_exception@plt>
+   6eab0:      	mov	x0, x20
+   6eab4:      	bl	0xb0b6c <_Unwind_Resume>
+   6eab8:      	bl	0xb5110 <__stack_chk_fail@plt>
+
+
+# カーネルの位置: 0.2.1 build 15 を CI でビルドし直したもの (コミット 7dcf4a18bc8685c2d373644199ce809da5a8eca9)
+
+tools: /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm: LLVM version 18.0.3 / /usr/local/lib/android/sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-objdump: LLVM version 18.0.3
+KERNEL_PATTERNS: count_primes_segmented, matmul_blocked | 余りは 64 バイト単位
+
+-- android/app/build/intermediates の下の arm64-v8a/libmobilebench_jni.so
+  android/app/build/intermediates/cxx/Debug/p4e3b5x1/obj/arm64-v8a/libmobilebench_jni.so: sha256 926c2fb3deeec8eed528ac25e4feb01c8e6511b92fa08f270f9dda696562f2ea .symtab あり
+  android/app/build/intermediates/merged_native_libs/debug/mergeDebugNativeLibs/out/lib/arm64-v8a/libmobilebench_jni.so: sha256 926c2fb3deeec8eed528ac25e4feb01c8e6511b92fa08f270f9dda696562f2ea .symtab あり
+  android/app/build/intermediates/stripped_native_libs/debug/stripDebugDebugSymbols/out/lib/arm64-v8a/libmobilebench_jni.so: sha256 feb4b1c588ffafde9ecd3e8475db1bfc8d6f99420c7021f5321a0969ee383da4 .symtab なし
+
+-- .so
+使った .so (android/app/build/intermediates/cxx/Debug/p4e3b5x1/obj/arm64-v8a/libmobilebench_jni.so): file sha256 926c2fb3deeec8eed528ac25e4feb01c8e6511b92fa08f270f9dda696562f2ea size 6520488 | build-id 994cf1ad08d041027b97097628f9949aff62262b | .text addr 0x443d0 offset 0x443d0 size 0x78198 sha256 23346a7e68c14c59dbb0216ee90ecbe3bef53024d42a09743d519bbe8c5660c9 | .symtab あり
+APK の lib/arm64-v8a/libmobilebench_jni.so (app-debug.apk): file sha256 feb4b1c588ffafde9ecd3e8475db1bfc8d6f99420c7021f5321a0969ee383da4 size 802088 | build-id 994cf1ad08d041027b97097628f9949aff62262b | .text addr 0x443d0 offset 0x443d0 size 0x78198 sha256 23346a7e68c14c59dbb0216ee90ecbe3bef53024d42a09743d519bbe8c5660c9 | .symtab なし
+  -> .text の中身: 同じ / .text のアドレス: 同じ / ファイル全体: 違う(使った .so と比べて)
+  カーネルの関数の動的シンボル (2 個):
+    addr 0x7420c (mod 64 = 12) size 952 mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+    addr 0x758f4 (mod 64 = 52) size 1812 mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+実機で使った APK (Android の実行 43670028049 = build 15) (MobileBench-debug-b15-7dcf4a1.apk の lib/arm64-v8a/libmobilebench_jni.so): file sha256 feb4b1c588ffafde9ecd3e8475db1bfc8d6f99420c7021f5321a0969ee383da4 size 802088 | build-id 994cf1ad08d041027b97097628f9949aff62262b | .text addr 0x443d0 offset 0x443d0 size 0x78198 sha256 23346a7e68c14c59dbb0216ee90ecbe3bef53024d42a09743d519bbe8c5660c9 | .symtab なし
+  -> .text の中身: 同じ / .text のアドレス: 同じ / ファイル全体: 違う(使った .so と比べて)
+  カーネルの関数の動的シンボル (2 個):
+    addr 0x7420c (mod 64 = 12) size 952 mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+    addr 0x758f4 (mod 64 = 52) size 1812 mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+  -> このビルドの APK の .so とファイル全体が: 同じ
+
+-- カーネルの関数 (2 個)
+mb::detail::matmul_blocked(double const*, double const*, double*, int, int)
+  addr 0x7420c (mod 64 = 12) size 952 (0x3b8) end 0x745c4
+  後ろ向きの分岐 11 個 (飛び先 / mod 64 / 分岐の位置 / 命令 / ループの長さ):
+    0x74294 / 20 / 0x74328 / b.le / 152 バイト
+    0x74304 /  4 / 0x743e8 / b.le / 232 バイト
+    0x743ac / 44 / 0x74444 / b.le / 156 バイト
+    0x743ac / 44 / 0x744d4 / b.ge / 300 バイト
+    0x744c0 /  0 / 0x744dc / b.le / 32 バイト
+    0x744c0 /  0 / 0x74520 / b.ge / 100 バイト
+    0x74510 / 16 / 0x74528 / b.le / 28 バイト
+    0x74510 / 16 / 0x7457c / b.eq / 112 バイト
+    0x74510 / 16 / 0x745a0 / b / 148 バイト
+    0x74550 / 16 / 0x74570 / b.ne / 36 バイト
+    0x74580 /  0 / 0x7459c / b.lt / 32 バイト
+  この関数を bl / b で呼ぶ箇所(先頭か PLT へ飛ぶもの) 0 個: なし
+    (この .so の中に、この関数の先頭や PLT へ飛ぶ bl / b はない。関数ポインタでの呼び出しは数えていない)
+mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)
+  addr 0x758f4 (mod 64 = 52) size 1812 (0x714) end 0x76008
+  後ろ向きの分岐 21 個 (飛び先 / mod 64 / 分岐の位置 / 命令 / ループの長さ):
+    0x75960 / 32 / 0x7596c / b.hi / 16 バイト
+    0x75974 / 52 / 0x75984 / b.ls / 20 バイト
+    0x759c8 /  8 / 0x75cb0 / b.hi / 748 バイト
+    0x75a40 /  0 / 0x75b28 / cbz / 236 バイト
+    0x75a48 /  8 / 0x75bfc / b.eq / 440 バイト
+    0x75a48 /  8 / 0x75c4c / b.eq / 520 バイト
+    0x75a48 /  8 / 0x75c68 / b / 548 バイト
+    0x75acc / 12 / 0x75ae4 / b.ls / 28 バイト
+    0x75acc / 12 / 0x75afc / b / 52 バイト
+    0x75aec / 44 / 0x75af8 / b.lo / 16 バイト
+    0x75b94 / 20 / 0x75bd0 / b.ne / 64 バイト
+    0x75c24 / 36 / 0x75c38 / b.ne / 24 バイト
+    0x75c54 / 20 / 0x75c64 / b.lo / 20 バイト
+    0x75ca8 / 40 / 0x75cbc / cbz / 24 バイト
+    0x75ca8 / 40 / 0x75f0c / b.hi / 616 バイト
+    0x75ca8 / 40 / 0x75f24 / b / 640 バイト
+    0x75d80 /  0 / 0x75d94 / b.ne / 24 バイト
+    0x75dac / 44 / 0x75db8 / b.ne / 16 バイト
+    0x75ea8 / 40 / 0x75ebc / b.ne / 24 バイト
+    0x75ed4 / 20 / 0x75ee0 / b.ne / 16 バイト
+    0x75f10 / 16 / 0x75f20 / b.ls / 20 バイト
+  この関数を bl / b で呼ぶ箇所(先頭か PLT へ飛ぶもの) 1 個:
+    0x76b50 bl (PLT) in mb::detail::SieveKernel::run_unit(int)
+
+-- 逆アセンブル
+0x7420c <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)>:
+   7420c:      	sub	sp, sp, #0x150
+   74210:      	stp	x29, x30, [sp, #0xf0]
+   74214:      	stp	x28, x27, [sp, #0x100]
+   74218:      	stp	x26, x25, [sp, #0x110]
+   7421c:      	stp	x24, x23, [sp, #0x120]
+   74220:      	stp	x22, x21, [sp, #0x130]
+   74224:      	stp	x20, x19, [sp, #0x140]
+   74228:      	str	x2, [sp, #0x18]
+   7422c:      	str	x1, [sp, #0x40]
+   74230:      	cmp	w3, #0x1
+   74234:      	str	x0, [sp, #0x98]
+   74238:      	b.lt	0x745a4 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x398>
+   7423c:      	sxtw	x17, w4
+   74240:      	mov	w11, w3
+   74244:      	sbfiz	x9, x4, #3, #32
+   74248:      	mov	x10, xzr
+   7424c:      	mov	x12, xzr
+   74250:      	ubfiz	x14, x3, #3, #32
+   74254:      	mul	x8, x17, x11
+   74258:      	stp	x9, x17, [sp, #0xa0]
+   7425c:      	ldr	x9, [sp, #0x40]
+   74260:      	str	x4, [sp, #0x90]
+   74264:      	str	x3, [sp, #0xb0]
+   74268:      	lsl	x13, x8, #3
+   7426c:      	add	x8, x9, #0x8
+   74270:      	add	x9, x9, #0x10
+   74274:      	stp	x8, x13, [sp, #0x30]
+   74278:      	ldr	x8, [sp, #0x18]
+   7427c:      	add	x15, x8, #0x8
+   74280:      	str	x8, [sp, #0x78]
+   74284:      	stp	x9, x15, [sp, #0x8]
+   74288:      	add	x9, x8, #0x10
+   7428c:      	str	x9, [sp, #0x48]
+   74290:      	b	0x742bc <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0xb0>
+   74294:      	ldr	x8, [sp, #0x48]
+   74298:      	ldp	x12, x10, [sp, #0x20]
+   7429c:      	add	x8, x8, x13
+   742a0:      	str	x8, [sp, #0x48]
+   742a4:      	ldr	x8, [sp, #0x78]
+   742a8:      	cmp	w3, w12
+   742ac:      	add	x10, x10, #0x1
+   742b0:      	add	x8, x8, x13
+   742b4:      	str	x8, [sp, #0x78]
+   742b8:      	b.le	0x745a4 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x398>
+   742bc:      	mul	x8, x13, x10
+   742c0:      	add	x9, x12, x17
+   742c4:      	mov	x15, xzr
+   742c8:      	cmp	w3, w9
+   742cc:      	stp	x9, x10, [sp, #0x20]
+   742d0:      	mov	x0, xzr
+   742d4:      	csel	w9, w3, w9, lt
+   742d8:      	str	x12, [sp, #0xb8]
+   742dc:      	sxtw	x21, w9
+   742e0:      	ldr	x9, [sp, #0x18]
+   742e4:      	add	x9, x9, x8
+   742e8:      	str	x9, [sp, #0x70]
+   742ec:      	ldp	x1, x9, [sp, #0x8]
+   742f0:      	add	x8, x9, x8
+   742f4:      	str	x8, [sp, #0x68]
+   742f8:      	ldr	x8, [sp, #0x40]
+   742fc:      	str	x8, [sp, #0xe8]
+   74300:      	b	0x7432c <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x120>
+   74304:      	ldp	x0, x15, [sp, #0x58]
+   74308:      	ldr	x13, [sp, #0x38]
+   7430c:      	ldr	x1, [sp, #0x50]
+   74310:      	ldr	x8, [sp, #0xe8]
+   74314:      	cmp	w3, w0
+   74318:      	add	x15, x15, #0x1
+   7431c:      	add	x1, x1, x13
+   74320:      	add	x8, x8, x13
+   74324:      	str	x8, [sp, #0xe8]
+   74328:      	b.le	0x74294 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x88>
+   7432c:      	madd	w8, w4, w15, w4
+   74330:      	add	x12, x0, #0x1
+   74334:      	str	xzr, [sp, #0xe0]
+   74338:      	mul	x9, x15, x17
+   7433c:      	mov	x2, xzr
+   74340:      	mov	x29, xzr
+   74344:      	str	x1, [sp, #0x50]
+   74348:      	sxtw	x8, w8
+   7434c:      	mul	x10, x13, x15
+   74350:      	cmp	x11, x8
+   74354:      	csel	x8, x11, x8, lt
+   74358:      	mvn	x9, x9
+   7435c:      	cmp	x8, x12
+   74360:      	add	x12, x0, x17
+   74364:      	csinc	x8, x8, x0, gt
+   74368:      	cmp	w3, w12
+   7436c:      	stp	x12, x15, [sp, #0x58]
+   74370:      	add	x8, x8, x9
+   74374:      	ldr	x9, [sp, #0x30]
+   74378:      	add	x9, x9, x10
+   7437c:      	madd	x8, x14, x8, x9
+   74380:      	str	x8, [sp, #0x88]
+   74384:      	csel	w8, w3, w12, lt
+   74388:      	mov	w12, w4
+   7438c:      	sxtw	x16, w8
+   74390:      	ldr	x8, [sp, #0x40]
+   74394:      	add	x8, x8, x10
+   74398:      	str	x8, [sp, #0x80]
+   7439c:      	ldr	x8, [sp, #0x48]
+   743a0:      	str	x8, [sp, #0xd8]
+   743a4:      	mov	w8, #0x1                // =1
+   743a8:      	b	0x743ec <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1e0>
+   743ac:      	ldp	x17, x3, [sp, #0xa8]
+   743b0:      	ldr	x4, [sp, #0x90]
+   743b4:      	ldp	x10, x9, [sp, #0xd8]
+   743b8:      	ldr	x12, [sp, #0xc0]
+   743bc:      	ldp	x29, x2, [sp, #0xc8]
+   743c0:      	add	w12, w12, w4
+   743c4:      	add	x8, x8, x17
+   743c8:      	sub	x9, x9, x17
+   743cc:      	str	x9, [sp, #0xe0]
+   743d0:      	ldr	x9, [sp, #0xa0]
+   743d4:      	add	x2, x2, #0x1
+   743d8:      	cmp	w3, w29
+   743dc:      	add	x1, x1, x9
+   743e0:      	add	x10, x10, x9
+   743e4:      	str	x10, [sp, #0xd8]
+   743e8:      	b.le	0x74304 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0xf8>
+   743ec:      	sxtw	x9, w12
+   743f0:      	madd	w10, w4, w2, w4
+   743f4:      	str	x12, [sp, #0xc0]
+   743f8:      	add	x15, x29, #0x1
+   743fc:      	ldr	x4, [sp, #0x98]
+   74400:      	cmp	x9, x11
+   74404:      	csel	x9, x9, x11, lt
+   74408:      	sxtw	x12, w10
+   7440c:      	cmp	x9, x8
+   74410:      	csel	x13, x9, x8, gt
+   74414:      	cmp	x11, x12
+   74418:      	csel	x9, x11, x12, lt
+   7441c:      	cmp	x9, x15
+   74420:      	csinc	x10, x9, x29, gt
+   74424:      	cmp	x11, x12
+   74428:      	csel	x9, x11, x12, lt
+   7442c:      	cmp	x9, x15
+   74430:      	csinc	x12, x9, x29, gt
+   74434:      	ldr	x9, [sp, #0xb8]
+   74438:      	cmp	w21, w9
+   7443c:      	add	x9, x29, x17
+   74440:      	stp	x9, x2, [sp, #0xc8]
+   74444:      	b.le	0x743ac <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1a0>
+   74448:      	ldp	x17, x15, [sp, #0xa0]
+   7444c:      	mov	x9, xzr
+   74450:      	ldp	x3, x2, [sp, #0xc8]
+   74454:      	ldr	x19, [sp, #0x78]
+   74458:      	mul	x15, x2, x15
+   7445c:      	mul	x17, x17, x2
+   74460:      	ldr	x2, [sp, #0xe0]
+   74464:      	add	x13, x13, x2
+   74468:      	ldr	x2, [sp, #0xb0]
+   7446c:      	and	x27, x13, #0xfffffffffffffffc
+   74470:      	cmp	w2, w3
+   74474:      	csel	w13, w2, w3, lt
+   74478:      	mvn	x3, x15
+   7447c:      	sub	x2, x10, x15
+   74480:      	sxtw	x20, w13
+   74484:      	add	x10, x12, x3
+   74488:      	and	x22, x2, #0xfffffffffffffffc
+   7448c:      	ldp	x13, x12, [sp, #0x80]
+   74490:      	lsl	x10, x10, #3
+   74494:      	add	x23, x29, x22
+   74498:      	add	x7, x13, x17
+   7449c:      	ldp	x13, x15, [sp, #0x68]
+   744a0:      	add	x12, x12, x17
+   744a4:      	add	x30, x12, x10
+   744a8:      	ldr	x12, [sp, #0xb8]
+   744ac:      	add	x6, x15, x17
+   744b0:      	add	x13, x13, x17
+   744b4:      	ldr	x15, [sp, #0xd8]
+   744b8:      	add	x17, x13, x10
+   744bc:      	b	0x744d8 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2cc>
+   744c0:      	add	x12, x12, #0x1
+   744c4:      	add	x9, x9, #0x1
+   744c8:      	add	x15, x15, x14
+   744cc:      	cmp	x12, x21
+   744d0:      	add	x19, x19, x14
+   744d4:      	b.ge	0x743ac <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x1a0>
+   744d8:      	cmp	w16, w0
+   744dc:      	b.le	0x744c0 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2b4>
+   744e0:      	mul	x10, x14, x9
+   744e4:      	ldr	x24, [sp, #0xe8]
+   744e8:      	mov	x26, x1
+   744ec:      	mov	x28, x0
+   744f0:      	mul	x13, x12, x11
+   744f4:      	add	x3, x6, x10
+   744f8:      	add	x10, x17, x10
+   744fc:      	cmp	x3, x30
+   74500:      	ccmp	x7, x10, #0x2, lo
+   74504:      	add	x3, x4, x13, lsl #3
+   74508:      	cset	w10, lo
+   7450c:      	b	0x74524 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x318>
+   74510:      	add	x28, x28, #0x1
+   74514:      	add	x26, x26, x14
+   74518:      	add	x24, x24, x14
+   7451c:      	cmp	x28, x16
+   74520:      	b.ge	0x744c0 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x2b4>
+   74524:      	cmp	w20, w29
+   74528:      	b.le	0x74510 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   7452c:      	cmp	x2, #0x4
+   74530:      	ldr	d0, [x3, x28, lsl #3]
+   74534:      	mov	x13, x29
+   74538:      	csinc	w5, w10, wzr, hs
+   7453c:      	tbnz	w5, #0x0, 0x74580 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x374>
+   74540:      	dup	v1.2d, v0.d[0]
+   74544:      	mov	x5, x15
+   74548:      	mov	x25, x26
+   7454c:      	mov	x13, x27
+   74550:      	ldp	q2, q4, [x25, #-0x10]
+   74554:      	subs	x13, x13, #0x4
+   74558:      	ldp	q3, q5, [x5, #-0x10]
+   7455c:      	add	x25, x25, #0x20
+   74560:      	fmla	v3.2d, v2.2d, v1.2d
+   74564:      	fmla	v5.2d, v4.2d, v1.2d
+   74568:      	stp	q3, q5, [x5, #-0x10]
+   7456c:      	add	x5, x5, #0x20
+   74570:      	b.ne	0x74550 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x344>
+   74574:      	cmp	x2, x22
+   74578:      	mov	x13, x23
+   7457c:      	b.eq	0x74510 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   74580:      	lsl	x5, x13, #3
+   74584:      	add	x13, x13, #0x1
+   74588:      	cmp	x13, x20
+   7458c:      	ldr	d1, [x24, x5]
+   74590:      	ldr	d2, [x19, x5]
+   74594:      	fmadd	d1, d0, d1, d2
+   74598:      	str	d1, [x19, x5]
+   7459c:      	b.lt	0x74580 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x374>
+   745a0:      	b	0x74510 <mb::detail::matmul_blocked(double const*, double const*, double*, int, int)+0x304>
+   745a4:      	ldp	x20, x19, [sp, #0x140]
+   745a8:      	ldp	x22, x21, [sp, #0x130]
+   745ac:      	ldp	x24, x23, [sp, #0x120]
+   745b0:      	ldp	x26, x25, [sp, #0x110]
+   745b4:      	ldp	x28, x27, [sp, #0x100]
+   745b8:      	ldp	x29, x30, [sp, #0xf0]
+   745bc:      	add	sp, sp, #0x150
+   745c0:      	ret
+
+0x758f4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)>:
+   758f4:      	sub	sp, sp, #0xd0
+   758f8:      	stp	x29, x30, [sp, #0x70]
+   758fc:      	stp	x28, x27, [sp, #0x80]
+   75900:      	stp	x26, x25, [sp, #0x90]
+   75904:      	stp	x24, x23, [sp, #0xa0]
+   75908:      	stp	x22, x21, [sp, #0xb0]
+   7590c:      	stp	x20, x19, [sp, #0xc0]
+   75910:      	add	x29, sp, #0x70
+   75914:      	mrs	x10, TPIDR_EL0
+   75918:      	ldr	x8, [x10, #0x28]
+   7591c:      	stur	x8, [x29, #-0x8]
+   75920:      	mov	w8, #-0x7fffffff        // =-2147483647
+   75924:      	cmp	w0, w8
+   75928:      	stur	w1, [x29, #-0x34]
+   7592c:      	b.hs	0x75f78 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x684>
+   75930:      	cmp	w0, #0x3
+   75934:      	b.hs	0x75940 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4c>
+   75938:      	mov	x0, xzr
+   7593c:      	b	0x75c70 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x37c>
+   75940:      	ldur	w8, [x29, #-0x34]
+   75944:      	cbz	w8, 0x75f98 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6a4>
+   75948:      	sub	w8, w0, #0x1
+   7594c:      	mov	x21, x2
+   75950:      	stur	w0, [x29, #-0x1c]
+   75954:      	ucvtf	d0, w8
+   75958:      	fsqrt	d0, d0
+   7595c:      	fcvtzu	x26, d0
+   75960:      	mul	x9, x26, x26
+   75964:      	sub	x26, x26, #0x1
+   75968:      	cmp	x9, x8
+   7596c:      	b.hi	0x75960 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6c>
+   75970:      	str	x10, [sp]
+   75974:      	add	x9, x26, #0x2
+   75978:      	add	x26, x26, #0x1
+   7597c:      	mul	x9, x9, x9
+   75980:      	cmp	x9, x8
+   75984:      	b.ls	0x75974 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x80>
+   75988:      	and	x9, x26, #0xffffffff
+   7598c:      	mov	w8, #0x1                // =1
+   75990:      	add	x0, x21, #0x18
+   75994:      	add	x1, x9, #0x1
+   75998:      	sub	x2, x29, #0xc
+   7599c:      	sturb	w8, [x29, #-0xc]
+   759a0:      	bl	0x76038 <std::__ndk1::vector<unsigned char, std::__ndk1::allocator<unsigned char>>::assign(unsigned long, unsigned char const&)>
+   759a4:      	mov	x22, x21
+   759a8:      	cmp	w26, #0x2
+   759ac:      	ldr	x8, [x22, #0x30]!
+   759b0:      	mov	x10, x22
+   759b4:      	ldr	x9, [x10, #0x18]!
+   759b8:      	stur	x10, [x29, #-0x18]
+   759bc:      	str	x8, [x22, #0x8]
+   759c0:      	str	x9, [x22, #0x20]
+   759c4:      	b.hs	0x75ca0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3ac>
+   759c8:      	ldp	x19, x8, [x21]
+   759cc:      	ldur	w9, [x29, #-0x34]
+   759d0:      	mov	w23, w9
+   759d4:      	sub	x8, x8, x19
+   759d8:      	subs	x1, x23, x8
+   759dc:      	b.ls	0x759ec <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0xf8>
+   759e0:      	mov	x0, x21
+   759e4:      	bl	0x76cc4 <std::__ndk1::vector<unsigned char, std::__ndk1::allocator<unsigned char>>::__append(unsigned long)>
+   759e8:      	ldr	x19, [x21]
+   759ec:      	ldp	x28, x8, [x21, #0x30]
+   759f0:      	neg	x10, x23
+   759f4:      	ldur	w9, [x29, #-0x1c]
+   759f8:      	ldr	x21, [x21, #0x48]
+   759fc:      	mov	w13, wzr
+   75a00:      	mov	x26, xzr
+   75a04:      	mov	x20, xzr
+   75a08:      	mov	x0, xzr
+   75a0c:      	str	x8, [sp, #0x20]
+   75a10:      	sub	x8, x8, x28
+   75a14:      	mov	w9, w9
+   75a18:      	asr	x8, x8, #2
+   75a1c:      	stp	x10, x9, [sp, #0x10]
+   75a20:      	add	x10, x19, #0x10
+   75a24:      	mov	x24, x23
+   75a28:      	mov	x22, x19
+   75a2c:      	str	x10, [sp, #0x8]
+   75a30:      	cmp	x8, #0x1
+   75a34:      	str	x23, [sp, #0x30]
+   75a38:      	csinc	x27, x8, xzr, hi
+   75a3c:      	b	0x75a70 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x17c>
+   75a40:      	ldr	x23, [sp, #0x30]
+   75a44:      	mov	w11, wzr
+   75a48:      	ldp	x8, x9, [sp, #0x10]
+   75a4c:      	add	x0, x0, w11, uxtw
+   75a50:      	ldur	x20, [x29, #-0x28]
+   75a54:      	add	x26, x26, #0x1
+   75a58:      	add	x24, x24, x23
+   75a5c:      	add	x22, x22, x8
+   75a60:      	ldur	w8, [x29, #-0x34]
+   75a64:      	cmp	x20, x9
+   75a68:      	sub	w13, w13, w8
+   75a6c:      	b.hs	0x75c6c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x378>
+   75a70:      	cmp	x24, x9
+   75a74:      	add	x8, x20, x23
+   75a78:      	stur	x0, [x29, #-0x18]
+   75a7c:      	csel	x10, x24, x9, lo
+   75a80:      	cmp	x8, x9
+   75a84:      	stur	x8, [x29, #-0x28]
+   75a88:      	csel	x23, x8, x9, lo
+   75a8c:      	mov	w8, #0x2                // =2
+   75a90:      	mov	x0, x19
+   75a94:      	cmp	x23, #0x2
+   75a98:      	mov	w1, #0x1                // =1
+   75a9c:      	stur	w13, [x29, #-0x1c]
+   75aa0:      	csel	x25, x23, x8, lo
+   75aa4:      	sub	x8, x23, x20
+   75aa8:      	str	x10, [sp, #0x28]
+   75aac:      	and	x2, x8, #0xffffffff
+   75ab0:      	stur	x8, [x29, #-0x30]
+   75ab4:      	bl	0xbd040 <memset@plt>
+   75ab8:      	ldr	x8, [sp, #0x20]
+   75abc:      	cmp	x8, x28
+   75ac0:      	b.eq	0x75b00 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x20c>
+   75ac4:      	mov	x8, xzr
+   75ac8:      	b	0x75adc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1e8>
+   75acc:      	str	w9, [x21, x8, lsl #2]
+   75ad0:      	add	x8, x8, #0x1
+   75ad4:      	cmp	x8, x27
+   75ad8:      	b.eq	0x75b00 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x20c>
+   75adc:      	ldr	w9, [x21, x8, lsl #2]
+   75ae0:      	cmp	x23, x9
+   75ae4:      	b.ls	0x75acc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1d8>
+   75ae8:      	ldr	w10, [x28, x8, lsl #2]
+   75aec:      	strb	wzr, [x22, x9]
+   75af0:      	add	x9, x9, x10
+   75af4:      	cmp	x9, x23
+   75af8:      	b.lo	0x75aec <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1f8>
+   75afc:      	b	0x75acc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x1d8>
+   75b00:      	cmp	x20, x25
+   75b04:      	b.hs	0x75b1c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x228>
+   75b08:      	ldr	x8, [sp, #0x30]
+   75b0c:      	mov	x0, x19
+   75b10:      	mov	w1, wzr
+   75b14:      	msub	x2, x26, x8, x25
+   75b18:      	bl	0xbd040 <memset@plt>
+   75b1c:      	ldur	x0, [x29, #-0x18]
+   75b20:      	ldur	w13, [x29, #-0x1c]
+   75b24:      	ldur	x14, [x29, #-0x30]
+   75b28:      	cbz	w14, 0x75a40 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x14c>
+   75b2c:      	ldur	w8, [x29, #-0x34]
+   75b30:      	msub	w8, w8, w26, w23
+   75b34:      	cmp	w8, #0x8
+   75b38:      	b.hs	0x75b4c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x258>
+   75b3c:      	ldr	x23, [sp, #0x30]
+   75b40:      	mov	x9, xzr
+   75b44:      	mov	w11, wzr
+   75b48:      	b	0x75c50 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x35c>
+   75b4c:      	ldp	x9, x23, [sp, #0x28]
+   75b50:      	cmp	w8, #0x20
+   75b54:      	add	w10, w13, w9
+   75b58:      	b.hs	0x75b68 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x274>
+   75b5c:      	mov	w11, wzr
+   75b60:      	mov	x9, xzr
+   75b64:      	b	0x75c08 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x314>
+   75b68:      	movi	v0.2d, #0000000000000000
+   75b6c:      	movi	v2.2d, #0000000000000000
+   75b70:      	ldr	x12, [sp, #0x8]
+   75b74:      	movi	v1.2d, #0000000000000000
+   75b78:      	movi	v3.2d, #0000000000000000
+   75b7c:      	and	x11, x10, #0xffffffe0
+   75b80:      	movi	v4.2d, #0000000000000000
+   75b84:      	movi	v6.2d, #0000000000000000
+   75b88:      	and	x9, x8, #0xffffffe0
+   75b8c:      	movi	v5.2d, #0000000000000000
+   75b90:      	movi	v7.2d, #0000000000000000
+   75b94:      	ldp	q16, q17, [x12, #-0x10]
+   75b98:      	subs	x11, x11, #0x20
+   75b9c:      	add	x12, x12, #0x20
+   75ba0:      	ushll2	v18.8h, v16.16b, #0x0
+   75ba4:      	ushll	v16.8h, v16.8b, #0x0
+   75ba8:      	ushll2	v19.8h, v17.16b, #0x0
+   75bac:      	ushll	v17.8h, v17.8b, #0x0
+   75bb0:      	uaddw2	v3.4s, v3.4s, v18.8h
+   75bb4:      	uaddw	v1.4s, v1.4s, v18.4h
+   75bb8:      	uaddw2	v2.4s, v2.4s, v16.8h
+   75bbc:      	uaddw	v0.4s, v0.4s, v16.4h
+   75bc0:      	uaddw2	v7.4s, v7.4s, v19.8h
+   75bc4:      	uaddw	v5.4s, v5.4s, v19.4h
+   75bc8:      	uaddw2	v6.4s, v6.4s, v17.8h
+   75bcc:      	uaddw	v4.4s, v4.4s, v17.4h
+   75bd0:      	b.ne	0x75b94 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x2a0>
+   75bd4:      	add	v2.4s, v6.4s, v2.4s
+   75bd8:      	add	v3.4s, v7.4s, v3.4s
+   75bdc:      	cmp	x9, x8
+   75be0:      	add	v0.4s, v4.4s, v0.4s
+   75be4:      	add	v1.4s, v5.4s, v1.4s
+   75be8:      	add	v0.4s, v0.4s, v1.4s
+   75bec:      	add	v1.4s, v2.4s, v3.4s
+   75bf0:      	add	v0.4s, v0.4s, v1.4s
+   75bf4:      	addv	s0, v0.4s
+   75bf8:      	fmov	w11, s0
+   75bfc:      	b.eq	0x75a48 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   75c00:      	tst	x8, #0x18
+   75c04:      	b.eq	0x75c50 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x35c>
+   75c08:      	movi	v0.2d, #0000000000000000
+   75c0c:      	movi	v1.2d, #0000000000000000
+   75c10:      	mov	v0.s[0], w11
+   75c14:      	and	x11, x10, #0xfffffff8
+   75c18:      	add	x10, x19, x9
+   75c1c:      	sub	x11, x9, x11
+   75c20:      	and	x9, x8, #0xfffffff8
+   75c24:      	ldr	d2, [x10], #0x8
+   75c28:      	adds	x11, x11, #0x8
+   75c2c:      	ushll	v2.8h, v2.8b, #0x0
+   75c30:      	uaddw2	v1.4s, v1.4s, v2.8h
+   75c34:      	uaddw	v0.4s, v0.4s, v2.4h
+   75c38:      	b.ne	0x75c24 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x330>
+   75c3c:      	add	v0.4s, v0.4s, v1.4s
+   75c40:      	cmp	x9, x8
+   75c44:      	addv	s0, v0.4s
+   75c48:      	fmov	w11, s0
+   75c4c:      	b.eq	0x75a48 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   75c50:      	and	x8, x14, #0xffffffff
+   75c54:      	ldrb	w10, [x19, x9]
+   75c58:      	add	x9, x9, #0x1
+   75c5c:      	cmp	x9, x8
+   75c60:      	add	w11, w11, w10
+   75c64:      	b.lo	0x75c54 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x360>
+   75c68:      	b	0x75a48 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x154>
+   75c6c:      	ldr	x10, [sp]
+   75c70:      	ldr	x8, [x10, #0x28]
+   75c74:      	ldur	x9, [x29, #-0x8]
+   75c78:      	cmp	x8, x9
+   75c7c:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75c80:      	ldp	x20, x19, [sp, #0xc0]
+   75c84:      	ldp	x22, x21, [sp, #0xb0]
+   75c88:      	ldp	x24, x23, [sp, #0xa0]
+   75c8c:      	ldp	x26, x25, [sp, #0x90]
+   75c90:      	ldp	x28, x27, [sp, #0x80]
+   75c94:      	ldp	x29, x30, [sp, #0x70]
+   75c98:      	add	sp, sp, #0xd0
+   75c9c:      	ret
+   75ca0:      	mov	w27, #0x2               // =2
+   75ca4:      	b	0x75cb4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3c0>
+   75ca8:      	add	w27, w27, #0x1
+   75cac:      	cmp	w27, w26
+   75cb0:      	b.hi	0x759c8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0xd4>
+   75cb4:      	ldur	x8, [x21, #0x18]
+   75cb8:      	ldrb	w8, [x8, w27, uxtw]
+   75cbc:      	cbz	w8, 0x75ca8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   75cc0:      	ldp	x23, x8, [x21, #0x38]
+   75cc4:      	cmp	x23, x8
+   75cc8:      	b.hs	0x75cd8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3e4>
+   75ccc:      	str	w27, [x23], #0x4
+   75cd0:      	mov	x28, x23
+   75cd4:      	b	0x75ddc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4e8>
+   75cd8:      	ldr	x24, [x22]
+   75cdc:      	sub	x20, x23, x24
+   75ce0:      	asr	x25, x20, #2
+   75ce4:      	add	x9, x25, #0x1
+   75ce8:      	lsr	x10, x9, #62
+   75cec:      	cbnz	x10, 0x75f5c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x668>
+   75cf0:      	sub	x8, x8, x24
+   75cf4:      	asr	x10, x8, #1
+   75cf8:      	cmp	x10, x9
+   75cfc:      	csel	x9, x10, x9, hi
+   75d00:      	mov	x10, #0x7ffffffffffffffc // =9223372036854775804
+   75d04:      	cmp	x8, x10
+   75d08:      	mov	x8, #0x3fffffffffffffff // =4611686018427387903
+   75d0c:      	csel	x19, x9, x8, lo
+   75d10:      	cbz	x19, 0x75d28 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x434>
+   75d14:      	lsr	x8, x19, #62
+   75d18:      	cbnz	x8, 0x75f28 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x634>
+   75d1c:      	lsl	x0, x19, #2
+   75d20:      	bl	0xbc610 <_Znwm@plt>
+   75d24:      	b	0x75d2c <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x438>
+   75d28:      	mov	x0, xzr
+   75d2c:      	add	x9, x0, x25, lsl #2
+   75d30:      	subs	x8, x23, x24
+   75d34:      	mov	x28, x9
+   75d38:      	str	w27, [x28], #0x4
+   75d3c:      	b.eq	0x75dc0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4cc>
+   75d40:      	sub	x8, x8, #0x4
+   75d44:      	cmp	x8, #0x1c
+   75d48:      	b.lo	0x75da8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b4>
+   75d4c:      	sub	x10, x23, x0
+   75d50:      	sub	x10, x10, x20
+   75d54:      	cmp	x10, #0x20
+   75d58:      	b.lo	0x75da8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b4>
+   75d5c:      	lsr	x8, x8, #2
+   75d60:      	sub	x13, x23, #0x10
+   75d64:      	add	x10, x8, #0x1
+   75d68:      	and	x11, x10, #0x7ffffffffffffff8
+   75d6c:      	lsl	x8, x11, #2
+   75d70:      	mov	x14, x11
+   75d74:      	sub	x12, x23, x8
+   75d78:      	sub	x8, x9, x8
+   75d7c:      	sub	x9, x9, #0x10
+   75d80:      	ldp	q1, q0, [x13, #-0x10]
+   75d84:      	subs	x14, x14, #0x8
+   75d88:      	sub	x13, x13, #0x20
+   75d8c:      	stp	q1, q0, [x9, #-0x10]
+   75d90:      	sub	x9, x9, #0x20
+   75d94:      	b.ne	0x75d80 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x48c>
+   75d98:      	cmp	x10, x11
+   75d9c:      	mov	x23, x12
+   75da0:      	mov	x9, x8
+   75da4:      	b.eq	0x75dc4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4d0>
+   75da8:      	mov	x8, x9
+   75dac:      	ldr	w9, [x23, #-0x4]!
+   75db0:      	cmp	x23, x24
+   75db4:      	str	w9, [x8, #-0x4]!
+   75db8:      	b.ne	0x75dac <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4b8>
+   75dbc:      	b	0x75dc4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4d0>
+   75dc0:      	mov	x8, x9
+   75dc4:      	add	x9, x0, x19, lsl #2
+   75dc8:      	stp	x8, x28, [x21, #0x30]
+   75dcc:      	str	x9, [x21, #0x40]
+   75dd0:      	cbz	x24, 0x75ddc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x4e8>
+   75dd4:      	mov	x0, x24
+   75dd8:      	bl	0xbc650 <_ZdlPv@plt>
+   75ddc:      	ldp	x25, x8, [x21, #0x50]
+   75de0:      	mul	w19, w27, w27
+   75de4:      	str	x28, [x21, #0x38]
+   75de8:      	cmp	x25, x8
+   75dec:      	b.hs	0x75dfc <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x508>
+   75df0:      	str	w19, [x25], #0x4
+   75df4:      	mov	x23, x25
+   75df8:      	b	0x75f04 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x610>
+   75dfc:      	ldur	x9, [x29, #-0x18]
+   75e00:      	ldr	x24, [x9]
+   75e04:      	sub	x20, x25, x24
+   75e08:      	asr	x23, x20, #2
+   75e0c:      	add	x9, x23, #0x1
+   75e10:      	lsr	x10, x9, #62
+   75e14:      	cbnz	x10, 0x75f40 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x64c>
+   75e18:      	sub	x8, x8, x24
+   75e1c:      	asr	x10, x8, #1
+   75e20:      	cmp	x10, x9
+   75e24:      	csel	x9, x10, x9, hi
+   75e28:      	mov	x10, #0x7ffffffffffffffc // =9223372036854775804
+   75e2c:      	cmp	x8, x10
+   75e30:      	mov	x8, #0x3fffffffffffffff // =4611686018427387903
+   75e34:      	csel	x28, x9, x8, lo
+   75e38:      	cbz	x28, 0x75e50 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x55c>
+   75e3c:      	lsr	x8, x28, #62
+   75e40:      	cbnz	x8, 0x75f28 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x634>
+   75e44:      	lsl	x0, x28, #2
+   75e48:      	bl	0xbc610 <_Znwm@plt>
+   75e4c:      	b	0x75e54 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x560>
+   75e50:      	mov	x0, xzr
+   75e54:      	add	x9, x0, x23, lsl #2
+   75e58:      	subs	x8, x25, x24
+   75e5c:      	mov	x23, x9
+   75e60:      	str	w19, [x23], #0x4
+   75e64:      	b.eq	0x75ee8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f4>
+   75e68:      	sub	x8, x8, #0x4
+   75e6c:      	cmp	x8, #0x1c
+   75e70:      	b.lo	0x75ed0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5dc>
+   75e74:      	sub	x10, x25, x0
+   75e78:      	sub	x10, x10, x20
+   75e7c:      	cmp	x10, #0x20
+   75e80:      	b.lo	0x75ed0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5dc>
+   75e84:      	lsr	x8, x8, #2
+   75e88:      	sub	x13, x25, #0x10
+   75e8c:      	add	x10, x8, #0x1
+   75e90:      	and	x11, x10, #0x7ffffffffffffff8
+   75e94:      	lsl	x8, x11, #2
+   75e98:      	mov	x14, x11
+   75e9c:      	sub	x12, x25, x8
+   75ea0:      	sub	x8, x9, x8
+   75ea4:      	sub	x9, x9, #0x10
+   75ea8:      	ldp	q1, q0, [x13, #-0x10]
+   75eac:      	subs	x14, x14, #0x8
+   75eb0:      	sub	x13, x13, #0x20
+   75eb4:      	stp	q1, q0, [x9, #-0x10]
+   75eb8:      	sub	x9, x9, #0x20
+   75ebc:      	b.ne	0x75ea8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5b4>
+   75ec0:      	cmp	x10, x11
+   75ec4:      	mov	x25, x12
+   75ec8:      	mov	x9, x8
+   75ecc:      	b.eq	0x75eec <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f8>
+   75ed0:      	mov	x8, x9
+   75ed4:      	ldr	w9, [x25, #-0x4]!
+   75ed8:      	cmp	x25, x24
+   75edc:      	str	w9, [x8, #-0x4]!
+   75ee0:      	b.ne	0x75ed4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5e0>
+   75ee4:      	b	0x75eec <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x5f8>
+   75ee8:      	mov	x8, x9
+   75eec:      	add	x9, x0, x28, lsl #2
+   75ef0:      	stp	x8, x23, [x21, #0x48]
+   75ef4:      	str	x9, [x21, #0x58]
+   75ef8:      	cbz	x24, 0x75f04 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x610>
+   75efc:      	mov	x0, x24
+   75f00:      	bl	0xbc650 <_ZdlPv@plt>
+   75f04:      	cmp	w19, w26
+   75f08:      	str	x23, [x21, #0x50]
+   75f0c:      	b.hi	0x75ca8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   75f10:      	ldur	x8, [x21, #0x18]
+   75f14:      	strb	wzr, [x8, w19, uxtw]
+   75f18:      	add	w19, w19, w27
+   75f1c:      	cmp	w19, w26
+   75f20:      	b.ls	0x75f10 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x61c>
+   75f24:      	b	0x75ca8 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x3b4>
+   75f28:      	ldr	x8, [sp]
+   75f2c:      	ldr	x8, [x8, #0x28]
+   75f30:      	ldur	x9, [x29, #-0x8]
+   75f34:      	cmp	x8, x9
+   75f38:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75f3c:      	bl	0x4812c <std::__throw_bad_array_new_length[abi:ne180000]()>
+   75f40:      	ldr	x8, [sp]
+   75f44:      	ldr	x8, [x8, #0x28]
+   75f48:      	ldur	x9, [x29, #-0x8]
+   75f4c:      	cmp	x8, x9
+   75f50:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75f54:      	ldur	x0, [x29, #-0x18]
+   75f58:      	bl	0x76cb0 <std::__ndk1::vector<unsigned int, std::__ndk1::allocator<unsigned int>>::__throw_length_error[abi:ne180000]() const>
+   75f5c:      	ldr	x8, [sp]
+   75f60:      	ldr	x8, [x8, #0x28]
+   75f64:      	ldur	x9, [x29, #-0x8]
+   75f68:      	cmp	x8, x9
+   75f6c:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75f70:      	mov	x0, x22
+   75f74:      	bl	0x76cb0 <std::__ndk1::vector<unsigned int, std::__ndk1::allocator<unsigned int>>::__throw_length_error[abi:ne180000]() const>
+   75f78:      	mov	w0, #0x10               // =16
+   75f7c:      	mov	x21, x10
+   75f80:      	bl	0xbc960 <__cxa_allocate_exception@plt>
+   75f84:      	mov	x19, x0
+   75f88:      	nop
+   75f8c:      	adr	x1, 0x28bd0 <mb::detail::(anonymous namespace)::kBoostIdleMs+0x3450>
+   75f90:      	bl	0x76008 <std::invalid_argument::invalid_argument[abi:ne180000](char const*)>
+   75f94:      	b	0x75fb4 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6c0>
+   75f98:      	mov	w0, #0x10               // =16
+   75f9c:      	mov	x21, x10
+   75fa0:      	bl	0xbc960 <__cxa_allocate_exception@plt>
+   75fa4:      	mov	x19, x0
+   75fa8:      	adrp	x1, 0x27000 <mb::detail::(anonymous namespace)::kBoostIdleMs+0x1880>
+   75fac:      	add	x1, x1, #0x707
+   75fb0:      	bl	0x76008 <std::invalid_argument::invalid_argument[abi:ne180000](char const*)>
+   75fb4:      	ldr	x8, [x21, #0x28]
+   75fb8:      	ldur	x9, [x29, #-0x8]
+   75fbc:      	cmp	x8, x9
+   75fc0:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75fc4:      	adrp	x1, 0xc3000 <typeinfo for (anonymous namespace)::itanium_demangle::PixelVectorType+0x10>
+   75fc8:      	adrp	x2, 0xc3000 <typeinfo for (anonymous namespace)::itanium_demangle::PixelVectorType+0x10>
+   75fcc:      	mov	x0, x19
+   75fd0:      	ldr	x1, [x1, #0x5c0]
+   75fd4:      	ldr	x2, [x2, #0x5c8]
+   75fd8:      	bl	0xbc990 <__cxa_throw@plt>
+   75fdc:      	b	0x75fe0 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x6ec>
+   75fe0:      	ldr	x8, [x21, #0x28]
+   75fe4:      	ldur	x9, [x29, #-0x8]
+   75fe8:      	mov	x20, x0
+   75fec:      	cmp	x8, x9
+   75ff0:      	b.ne	0x76004 <mb::detail::count_primes_segmented(unsigned int, unsigned int, mb::detail::SieveScratch&)+0x710>
+   75ff4:      	mov	x0, x19
+   75ff8:      	bl	0xbd0c0 <__cxa_free_exception@plt>
+   75ffc:      	mov	x0, x20
+   76000:      	bl	0xb80bc <_Unwind_Resume>
+   76004:      	bl	0xbc660 <__stack_chk_fail@plt>
+
+

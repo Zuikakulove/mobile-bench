@@ -15,6 +15,7 @@
 | `2026-11-12-nothing-phone-1/` | Nothing Phone (1)(A063、SM7325、Android 15) | 0.2.0 build 12(`8145938`) | 診断モードをオンにして、続けて 2 回実行(`run1.txt`、`run2.txt`) | どちらも 10,000 文字で切れている。行列サイズ掃引の表(`run1.txt` は全行、`run2.txt` は 2 行目以降)と、周波数の最小・最大の行がない |
 | `2026-11-15-nothing-phone-1/` | Nothing Phone (1)(A063、SM7325、Android 15、OS のビルド V3.2-260416-1140) | 0.2.1 build 15(`7dcf4a1`) | 診断モードをオンにして、続けて 2 回実行(`run1-part1.txt`、`run1-part2.txt`、`run2-part1.txt`、`run2-part2.txt`) | なし。4 パートとも終端の行があり、文字数が一致 |
 | `2026-11-15-honor-magic7-rsr/` | HONOR 端末(8 Elite 搭載機。型番の報告値 PTP-AN20、SM8750、Android 17、OS のビルド PTP-AN20 11.0.0.117(SP2C00E117R102P1)) | 0.2.1 build 15(`7dcf4a1`) | 診断モードをオンにして 2 回実行(約 3 時間あけた。ファイル名は上と同じ形)。性能モードは 2 回とも「標準」。2 回目の実行中、画面には触れていない | なし。4 パートとも終端の行があり、文字数が一致 |
+| `2026-11-17-kernel-layout/` | なし(CI の出力。要約ではない) | 0.2.0 build 12(`8145938`)、0.2.1 build 15(`7dcf4a1`) | `kernel-layout.yml` の実行 `43984178710` の成果物 `kernel-layout-build12-build15` の中のテキストを、そのまま置いた。2 つのコミットを CI でビルドし直した `libmobilebench_jni.so`(arm64-v8a)と、実機で使った APK(Android の実行 `42952127373`、`43670028049`)の `.so` の比較と、カーネルの関数とループの位置、逆アセンブル(`docs/DESIGN.md` §6 C8)。`analyze_summary.py` には読ませない | なし |
 
 ## 道具
 

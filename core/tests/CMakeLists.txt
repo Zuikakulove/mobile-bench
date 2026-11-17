@@ -4,6 +4,7 @@ add_executable(mobilebench_tests
   test_runner.cpp
   test_stats_json.cpp
   test_summary.cpp
+  test_windows.cpp
 )
 target_include_directories(mobilebench_tests PRIVATE ${PROJECT_SOURCE_DIR}/src)
 target_link_libraries(mobilebench_tests PRIVATE mobilebench_core)

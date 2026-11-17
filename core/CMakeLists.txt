@@ -33,6 +33,7 @@ add_library(mobilebench_core STATIC
   src/worker_pool.cpp
   src/tests/cpu_matmul.cpp
   src/tests/cpu_sieve.cpp
+  src/tests/timed_kernels.cpp
 )
 target_include_directories(mobilebench_core
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include

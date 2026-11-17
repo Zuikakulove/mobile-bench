@@ -94,4 +94,18 @@ void MatmulKernel::release() {
   c_.clear();
 }
 
+// matmul_checksum の行の範囲を限ったもの (行列積の片の照合に使う。docs/PHASE1_PLAN.md P3.4)。
+// 行ごとの和も、行の範囲の和も 2^53 未満の整数なので、範囲ごとの値を整数で足すと全体の値になる。
+// 既存の関数の、このファイルの中での並びを変えないよう、末尾に置く (§1.8 (4)。位置が動く範囲を小さくする)
+std::uint64_t matmul_checksum_rows(const double* c, int n, int i0, int i1) {
+  double sum = 0.0;
+  for (int i = i0; i < i1; ++i) {
+    double row = 0.0;
+    const double* c_row = c + static_cast<size_t>(i) * n;
+    for (int j = 0; j < n; ++j) row += c_row[j] * col_weight(j);
+    sum += row * row_weight(i);
+  }
+  return static_cast<std::uint64_t>(static_cast<std::int64_t>(sum));
+}
+
 }  // namespace mb::detail

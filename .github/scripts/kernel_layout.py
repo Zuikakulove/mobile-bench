@@ -168,8 +168,10 @@ def main():
     nm = os.path.join(args.tools_dir, "llvm-nm") if args.tools_dir else "llvm-nm"
     objdump = os.path.join(args.tools_dir, "llvm-objdump") if args.tools_dir else "llvm-objdump"
     out = [f"# カーネルの位置: {args.label}", ""]
-    out.append(f"tools: {run(nm, '--version').splitlines()[0].strip()} / "
-               f"{[x for x in run(objdump, '--version').splitlines() if x.strip()][0].strip()}")
+    def version(tool):
+        lines = [x.strip() for x in run(tool, "--version").splitlines() if x.strip()]
+        return next((x for x in lines if "version" in x.lower()), lines[0] if lines else "?")
+    out.append(f"tools: {nm}: {version(nm)} / {objdump}: {version(objdump)}")
     out.append(f"KERNEL_PATTERNS: {', '.join(KERNEL_PATTERNS)} | 余りは {LINE} バイト単位")
     out.append("")
 

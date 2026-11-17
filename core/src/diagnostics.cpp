@@ -134,16 +134,38 @@ int diagnostics_steps(size_t cluster_count, const DiagnosticsOptions& options) {
                           groups * kMeasuresPerCluster + kSizeCount * 2 * (kWarmup + kRuns));
 }
 
+int clock_probe_inload_at_ms(int load_ms) { return std::max(load_ms - 15, load_ms / 2); }
+
+namespace {
+
+// ワーカーごとの値 (0 = 推定できなかった) から、平均・最小・最大を求める
+void summarize_ghz(const std::vector<double>& values, double& mean, double& lo, double& hi) {
+  double sum = 0.0;
+  int n = 0;
+  mean = lo = hi = 0.0;
+  for (double g : values) {
+    if (g <= 0) continue;
+    lo = n == 0 ? g : std::min(lo, g);
+    hi = std::max(hi, g);
+    sum += g;
+    ++n;
+  }
+  mean = n > 0 ? sum / n : 0.0;
+}
+
+}  // namespace
+
 ClockProbeComparison run_clock_probe_comparison(int threads, int samples, int rest_ms, int load_ms,
                                                 const std::atomic<bool>& cancelled, const StepCallback& on_step) {
+  using clock = std::chrono::steady_clock;
   ClockProbeComparison out;
   out.workers = std::max(threads, 1);
   out.rest_ms = rest_ms;
   out.load_ms = load_ms;
-  out.count_from_ms = load_ms / 2;  // 後半だけ数える (初期値: 100 ms のうち後半の 50 ms。§5.5)
+  out.inload_at_ms = clock_probe_inload_at_ms(load_ms);  // 既定 (100 ms) では 85 ms
   WorkerPool pool(out.workers);
   std::vector<double> current(static_cast<size_t>(out.workers));
-  std::vector<CountedSpin> counted(static_cast<size_t>(out.workers));
+  std::vector<double> inload(static_cast<size_t>(out.workers));
   const std::int64_t t0 = now_ns();
   for (int i = 0; i < samples && !cancelled.load(); ++i) {
     on_step("Diagnostics: clock probe " + std::to_string(i + 1) + "/" + std::to_string(samples), false);
@@ -151,36 +173,19 @@ ClockProbeComparison run_clock_probe_comparison(int threads, int samples, int re
     if (cancelled.load()) break;
     ClockProbeSample s;
     s.t_ms = (now_ns() - t0) / 1'000'000;
-    // 現行の loaded_probe (runner.cpp) と同じ負荷と推定に、負荷の後半の加算の数え上げを足したもの
+    // T0: ワーカーを起こす直前に読む共通の時刻。候補 (b) は、全ワーカーがこの時刻から数えて同じ時点で推定する
+    const clock::time_point common = clock::now();
+    const clock::time_point inload_at = common + std::chrono::milliseconds(out.inload_at_ms);
     pool.run([&](int w) {
-      counted[static_cast<size_t>(w)] = busy_spin_counted(out.load_ms, out.count_from_ms);
+      const clock::time_point own_start = clock::now();
+      busy_spin_until(inload_at);
+      inload[static_cast<size_t>(w)] = estimate_clock_ghz();  // 候補 (b): 全ワーカーが負荷を続けている間の推定
+      // 現行の loaded_probe (runner.cpp) と同じく、自分の開始から load_ms が過ぎるまで負荷をかけてから推定する
+      busy_spin_until(own_start + std::chrono::milliseconds(out.load_ms));
       current[static_cast<size_t>(w)] = estimate_clock_ghz();
     });
-    double current_sum = 0.0;
-    int current_n = 0;
-    std::uint64_t adds = 0;
-    std::int64_t ns = 0;
-    bool first_counted = true;
-    for (size_t w = 0; w < current.size(); ++w) {
-      const double g = current[w];
-      if (g > 0) {
-        s.current_min = current_n == 0 ? g : std::min(s.current_min, g);
-        s.current_max = std::max(s.current_max, g);
-        current_sum += g;
-        ++current_n;
-      }
-      const CountedSpin& c = counted[w];
-      if (c.ns > 0) {
-        const double cg = static_cast<double>(c.adds) / static_cast<double>(c.ns);
-        s.counted_min = first_counted ? cg : std::min(s.counted_min, cg);
-        s.counted_max = std::max(s.counted_max, cg);
-        first_counted = false;
-        adds += c.adds;
-        ns += c.ns;
-      }
-    }
-    s.current_ghz = current_n > 0 ? current_sum / current_n : 0.0;
-    s.counted_ghz = ns > 0 ? static_cast<double>(adds) / static_cast<double>(ns) : 0.0;
+    summarize_ghz(current, s.current_ghz, s.current_min, s.current_max);
+    summarize_ghz(inload, s.inload_ghz, s.inload_min, s.inload_max);
     out.samples.push_back(s);
   }
   return out;
@@ -350,7 +355,7 @@ void run_diagnostics(int threads, const CpuTopology& topology, const std::vector
     out.boost.push_back(run_boost_trace(idle, kBoostLoadMs, cancelled));
   }
 
-  // 2. 状態を確かめるクロックの比較 (§6 V22)
+  // 2. 状態を確かめるクロックの比較 (現行の値と候補 (a)(b)。§6 V22)
   if (cancelled.load()) return;
   out.clock_probe = run_clock_probe_comparison(threads, options.probe_samples, options.probe_rest_ms,
                                                options.probe_load_ms, cancelled, on_step);

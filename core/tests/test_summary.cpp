@@ -1,5 +1,6 @@
 // 要約の分割 (docs/DESIGN.md §5.6) と、0.2.1 で診断に足した計測のテスト。
 #include <algorithm>
+#include <chrono>
 #include <atomic>
 #include <set>
 #include <string>
@@ -48,7 +49,7 @@ SuiteResult large_result() {
   SuiteResult r;
   r.benchmark_version = kBenchmarkVersion;
   r.started_utc = "2026-11-15T01:23:45Z";
-  r.device = {{"app_version", "0.2.1"}, {"app_build", "123"}, {"git_sha", "abcdef0"}, {"manufacturer", "Maker"},
+  r.device = {{"app_version", "0.2.2"}, {"app_build", "123"}, {"git_sha", "abcdef0"}, {"manufacturer", "Maker"},
               {"model", "Model-X"}, {"soc_model", "SOC1234"}, {"platform", "android"}, {"os_version", "16"},
               {"os_build", "BP2A.250605.031.A3 release-keys"}, {"os_build_id", "BP2A.250605.031.A3"},
               {"os_incremental", "1234567890"}, {"os_security_patch", "2026-10-05"},
@@ -62,6 +63,10 @@ SuiteResult large_result() {
   r.logical_cores = kCores;
   r.diagnostics_enabled = true;
   r.phases = {{"peak", 1234.5, true, true}, {"sustained", 1100.0, true, false}};
+  r.interrupted = true;
+  r.interruption = "left_foreground";
+  r.input.touches = 250;
+  for (std::size_t i = 0; i < kMaxTouchTimes; ++i) r.input.touch_ms.push_back(123'456 + static_cast<std::int64_t>(i) * 1000);
   for (int c = 0; c < kCores; ++c) {
     r.topology.max_khz.push_back(1'000'000 + c * 123'400);
     r.topology.capacity.push_back(100 + c * 50);
@@ -82,6 +87,7 @@ SuiteResult large_result() {
       t.wait_ms = std::string(phase) == "peak" ? 2000 : -1;
       t.recovered = i != 3;
       t.recovery_ghz = 2.2;
+      t.touches = 99;
       t.valid = true;
       t.conditions_before = base;
       t.conditions_after = base;
@@ -120,7 +126,7 @@ SuiteResult large_result() {
   d.clock_probe.workers = kCores;
   d.clock_probe.rest_ms = 2000;
   d.clock_probe.load_ms = 100;
-  d.clock_probe.count_from_ms = 50;
+  d.clock_probe.inload_at_ms = 85;
   for (int i = 0; i < 12; ++i) d.clock_probe.samples.push_back({i * 2100, 2.27, 1.80, 2.52, 2.11, 1.80, 2.51});
   for (const auto& cpus : detail::cpu_clusters(r.topology, kCores)) {
     ClusterResult c;
@@ -333,39 +339,81 @@ TEST(cluster_measure_supports_unit_candidates) {
   EXPECT_EQ(bad.error, std::string("unknown kernel"));
 }
 
-TEST(busy_spin_counted_counts_second_half) {
-  const detail::CountedSpin c = detail::busy_spin_counted(40, 20);
-#if defined(__x86_64__) || defined(__aarch64__) || defined(__arm64__)
-  EXPECT_TRUE(c.adds > 0);
-  EXPECT_TRUE(c.ns >= 15'000'000 && c.ns < 200'000'000);  // 約 20 ms (共有環境なので上は緩く)
-  const double ghz = static_cast<double>(c.adds) / static_cast<double>(c.ns);
-  EXPECT_TRUE(ghz > 0.3 && ghz < 7.0);
-#else
-  EXPECT_EQ(c.adds, 0u);
-#endif
+TEST(busy_spin_until_spins_until_deadline) {
+  using clock = std::chrono::steady_clock;
+  const auto t0 = clock::now();
+  detail::busy_spin_until(t0 + std::chrono::milliseconds(20));
+  EXPECT_TRUE(clock::now() - t0 >= std::chrono::milliseconds(20));
+  // 過ぎた時刻なら、負荷をかけずにすぐ戻る (上限は共有環境なので緩く)
+  const auto t1 = clock::now();
+  detail::busy_spin_until(t1 - std::chrono::milliseconds(5));
+  EXPECT_TRUE(clock::now() - t1 < std::chrono::milliseconds(100));
 }
 
-TEST(clock_probe_comparison_records_both_methods) {
+TEST(clock_probe_inload_time) {
+  EXPECT_EQ(detail::clock_probe_inload_at_ms(100), 85);  // 既定 (ピーク段階の確認と同じ 100 ms)
+  EXPECT_EQ(detail::clock_probe_inload_at_ms(20), 10);   // 短い負荷では半分
+  EXPECT_EQ(detail::clock_probe_inload_at_ms(30), 15);
+}
+
+TEST(clock_probe_comparison_records_current_and_inload) {
   std::atomic<bool> cancelled{false};
   int steps = 0;
   const ClockProbeComparison cp =
       detail::run_clock_probe_comparison(2, 3, 10, 20, cancelled, [&](const std::string&, bool) { ++steps; });
   EXPECT_EQ(steps, 3);
   EXPECT_EQ(cp.workers, 2);
-  EXPECT_EQ(cp.count_from_ms, 10);
+  EXPECT_EQ(cp.rest_ms, 10);
+  EXPECT_EQ(cp.load_ms, 20);
+  EXPECT_EQ(cp.inload_at_ms, 10);
   EXPECT_EQ(cp.samples.size(), 3u);
-  for (size_t i = 1; i < cp.samples.size(); ++i) EXPECT_TRUE(cp.samples[i].t_ms >= cp.samples[i - 1].t_ms + 10);
+  // 各回は rest_ms 休んでから始まり、負荷は load_ms 以上かかる
+  for (size_t i = 1; i < cp.samples.size(); ++i) EXPECT_TRUE(cp.samples[i].t_ms >= cp.samples[i - 1].t_ms + 30);
 #if defined(__x86_64__) || defined(__aarch64__) || defined(__arm64__)
   for (const auto& s : cp.samples) {
     EXPECT_TRUE(s.current_ghz > 0.3 && s.current_ghz < 7.0);
-    EXPECT_TRUE(s.counted_ghz > 0.3 && s.counted_ghz < 7.0);
-    EXPECT_TRUE(s.counted_min <= s.counted_ghz + 1e-9 && s.counted_ghz <= s.counted_max + 1e-9);
+    EXPECT_TRUE(s.inload_ghz > 0.3 && s.inload_ghz < 7.0);
+    // 最小 <= 平均 <= 最大
     EXPECT_TRUE(s.current_min <= s.current_ghz + 1e-9 && s.current_ghz <= s.current_max + 1e-9);
+    EXPECT_TRUE(s.inload_min <= s.inload_ghz + 1e-9 && s.inload_ghz <= s.inload_max + 1e-9);
   }
+#else
+  for (const auto& s : cp.samples) EXPECT_EQ(s.inload_ghz, 0.0);
 #endif
   // 取り消されたら途中で止まる
   std::atomic<bool> stop{true};
   EXPECT_TRUE(detail::run_clock_probe_comparison(2, 5, 10, 20, stop, [](const std::string&, bool) {}).samples.empty());
+}
+
+TEST(summary_probe_lines_show_current_and_candidates) {
+  SuiteResult r;
+  r.benchmark_version = kBenchmarkVersion;
+  r.diagnostics_enabled = true;
+  auto& cp = r.diagnostics.clock_probe;
+  cp.workers = 8;
+  cp.rest_ms = 2000;
+  cp.load_ms = 100;
+  cp.inload_at_ms = 85;
+  cp.samples.push_back({2020, 2.308, 1.80, 2.52, 2.116, 1.80, 2.52});
+  cp.samples.push_back({4120, 2.200, 1.80, 2.48, 2.100, 1.79, 2.50});
+  const std::string text = make_summary_text(r);
+  EXPECT_TRUE(text.find("\n  probe rest 2000ms load 100ms workers 8 | current = mean of per-worker estimate after load, "
+                        "inload = mean of per-worker estimate at 85ms while all workers keep loading "
+                        "(GHz, per-worker min-max)\n") != std::string::npos);
+  EXPECT_TRUE(text.find("\n    2020ms current 2.308 (1.80-2.52) inload 2.116 (1.80-2.52)\n") != std::string::npos);
+  // 平均と幅: current (2.308, 2.200) -> 2.254, 4.8%。(a) current-max (2.52, 2.48) -> 2.500, 1.6%。
+  // (b) inload (2.116, 2.100) -> 2.108, 0.8%。inload-max (2.52, 2.50) -> 2.510, 0.8%
+  EXPECT_TRUE(text.find("\n  probe 2 samples: current mean 2.254 range 4.8% | (a) current-max mean 2.500 range 1.6% | "
+                        "(b) inload mean 2.108 range 0.8% | inload-max mean 2.510 range 0.8% "
+                        "(range = (max-min)/mean)\n") != std::string::npos);
+}
+
+TEST(large_summary_includes_interrupt_and_touch_lines) {
+  const SuiteResult r = large_result();
+  const std::string text = make_summary_text(r);
+  EXPECT_TRUE(text.find(" valid=no INTERRUPTED(left_foreground) cores=16 diag=yes\n") != std::string::npos);
+  EXPECT_TRUE(text.find("\ninput touches 250 at_ms 123456 124456 ") != std::string::npos);
+  EXPECT_TRUE(text.find(" attempts 3 wait 2000ms rec 2.20G touches 99\n") != std::string::npos);
 }
 
 TEST(diagnostics_steps_include_new_measures) {

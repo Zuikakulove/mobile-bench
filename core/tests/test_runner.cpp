@@ -120,6 +120,114 @@ TEST(runner_can_be_cancelled) {
   EXPECT_EQ(r.tests.size(), 1u);
 }
 
+// ---- v0.2.2: 前面を離れたときの中断と、画面へのタッチの記録 (docs/PHASE1_PLAN.md P3.10、P3.11) -----------
+
+TEST(runner_interrupt_stops_and_invalidates_without_cancel) {
+  std::vector<TestPtr> tests;
+  for (int i = 0; i < 3; ++i) tests.push_back(std::make_unique<FakeTest>("t" + std::to_string(i), 1'000'000, 1, 1));
+  Runner runner;
+  SuiteResult r = runner.run_tests(std::move(tests), [&](const Progress& p) {
+    if (p.test_index == 1) runner.interrupt(kInterruptLeftForeground);
+  });
+  EXPECT_TRUE(r.interrupted);
+  EXPECT_EQ(r.interruption, std::string("left_foreground"));
+  EXPECT_TRUE(!r.cancelled);  // 利用者の中止とは区別する
+  EXPECT_TRUE(!r.valid);
+  EXPECT_EQ(r.overall_score, 0.0);
+  EXPECT_EQ(r.tests.size(), 1u);  // それまでに終わったテストは残す (中止と同じ)
+  EXPECT_TRUE(r.tests[0].valid);
+  EXPECT_TRUE(r.summary_text.find(" valid=no INTERRUPTED(left_foreground) cores=") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("CANCELLED") == std::string::npos);
+  const std::string json = to_json(r, false);
+  EXPECT_TRUE(json.find("\"cancelled\":false,\"interrupted\":true,\"interruption\":\"left_foreground\"") !=
+              std::string::npos);
+}
+
+TEST(runner_records_cancel_and_interrupt_separately) {
+  std::vector<TestPtr> tests;
+  for (int i = 0; i < 2; ++i) tests.push_back(std::make_unique<FakeTest>("t" + std::to_string(i), 1'000'000, 1, 1));
+  Runner runner;
+  SuiteResult r = runner.run_tests(std::move(tests), [&](const Progress& p) {
+    if (p.test_index == 1) runner.cancel();
+  });
+  EXPECT_TRUE(r.cancelled);
+  EXPECT_TRUE(!r.interrupted);
+  EXPECT_EQ(r.interruption, std::string(""));
+  EXPECT_TRUE(r.summary_text.find(" CANCELLED cores=") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find("INTERRUPTED") == std::string::npos);
+  EXPECT_TRUE(to_json(r, false).find("\"interrupted\":false,\"interruption\":\"\"") != std::string::npos);
+}
+
+TEST(runner_records_touches_only_while_running) {
+  std::vector<TestPtr> tests;
+  tests.push_back(std::make_unique<FakeTest>("a", 1'000'000, 1, 1));
+  tests.push_back(std::make_unique<FakeTest>("b", 1'000'000, 1, 1));
+  Runner runner;
+  runner.note_touch();  // run() の前: 数えない
+  int calls_a = 0;
+  bool final_report_seen = false;
+  SuiteResult r = runner.run_tests(std::move(tests), [&](const Progress& p) {
+    if (p.step == p.total_steps) {  // 最後の通知は、記録を締めた後に来る: 数えない
+      final_report_seen = true;
+      runner.note_touch();
+      return;
+    }
+    if (p.test_index == 0 && (++calls_a == 2 || calls_a == 3)) runner.note_touch();  // 計測中に 2 回
+  });
+  runner.note_touch();  // run() の後: 数えない
+  EXPECT_TRUE(final_report_seen);
+  EXPECT_EQ(r.input.touches, 2);
+  EXPECT_EQ(r.input.touch_ms.size(), 2u);
+  if (r.input.touch_ms.size() == 2) {
+    EXPECT_TRUE(r.input.touch_ms[0] >= 0);
+    EXPECT_TRUE(r.input.touch_ms[1] >= r.input.touch_ms[0]);
+  }
+  EXPECT_EQ(r.tests.size(), 2u);
+  EXPECT_EQ(r.tests[0].touches, 2);
+  EXPECT_EQ(r.tests[1].touches, 0);
+  EXPECT_TRUE(r.valid);  // 判定には使わない
+  EXPECT_TRUE(r.summary_text.find("\ninput touches 2 at_ms ") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find(" attempts 1 touches 2\n") != std::string::npos);  // [peak a] の見出し
+  EXPECT_TRUE(r.summary_text.find("[peak b] median") != std::string::npos);
+  EXPECT_TRUE(r.summary_text.find(" touches 0") == std::string::npos);  // 0 回のテストには出さない
+  const std::string json = to_json(r, false);
+  EXPECT_TRUE(json.find("\"input\":{\"touches\":2,\"touch_ms\":[") != std::string::npos);
+  EXPECT_TRUE(json.find("\"touches\":2,\"checksum\"") != std::string::npos);
+  EXPECT_TRUE(json.find("\"touches\":0,\"checksum\"") != std::string::npos);
+}
+
+TEST(runner_keeps_first_touch_times_only) {
+  std::vector<TestPtr> tests;
+  tests.push_back(std::make_unique<FakeTest>("a", 1'000'000, 1, 1));
+  Runner runner;
+  bool done = false;
+  SuiteResult r = runner.run_tests(std::move(tests), [&](const Progress&) {
+    if (done) return;
+    done = true;
+    for (int i = 0; i < 150; ++i) runner.note_touch();
+  });
+  EXPECT_EQ(r.input.touches, 150);
+  EXPECT_EQ(r.input.touch_ms.size(), kMaxTouchTimes);
+  // 要約の時刻は先頭の 10 個まで
+  const auto pos = r.summary_text.find("\ninput touches 150 at_ms ");
+  EXPECT_TRUE(pos != std::string::npos);
+  if (pos != std::string::npos) {
+    const auto end = r.summary_text.find('\n', pos + 1);
+    const std::string line = r.summary_text.substr(pos + 1, end - pos - 1);
+    EXPECT_EQ(static_cast<int>(std::count(line.begin(), line.end(), ' ')), 3 + 10);
+  }
+}
+
+TEST(summary_shows_zero_touches) {
+  std::vector<TestPtr> tests;
+  tests.push_back(std::make_unique<FakeTest>("a", 1'000'000, 1, 1));
+  Runner runner;
+  SuiteResult r = runner.run_tests(std::move(tests), {});
+  EXPECT_EQ(r.input.touches, 0);
+  EXPECT_TRUE(r.summary_text.find("\ninput touches 0\n") != std::string::npos);
+  EXPECT_TRUE(to_json(r, false).find("\"input\":{\"touches\":0,\"touch_ms\":[]}") != std::string::npos);
+}
+
 TEST(default_suite_definition) {
   auto suite = create_default_suite({});
   EXPECT_EQ(suite.size(), 4u);
@@ -238,7 +346,7 @@ TEST(runner_records_run_details_including_warmup) {
     EXPECT_EQ(r.tests[0].run_details[static_cast<size_t>(kWarmupRuns + i)].ns, r.tests[0].runs_ns[static_cast<size_t>(i)]);
   }
   const std::string json = to_json(r, false);
-  EXPECT_TRUE(json.find("\"schema_version\":6") != std::string::npos);
+  EXPECT_TRUE(json.find("\"schema_version\":7") != std::string::npos);
   EXPECT_TRUE(json.find("\"summary_parts\":[\"MobileBench v") != std::string::npos);
   EXPECT_TRUE(json.find("\"run_details\":[{\"warmup\":true") != std::string::npos);
   EXPECT_TRUE(json.find("\"cpu_topology\":{\"source\":") != std::string::npos);

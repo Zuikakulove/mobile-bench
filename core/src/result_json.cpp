@@ -123,7 +123,7 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
   w.key("workers"); w.value(d.clock_probe.workers);
   w.key("rest_ms"); w.value(d.clock_probe.rest_ms);
   w.key("load_ms"); w.value(d.clock_probe.load_ms);
-  w.key("count_from_ms"); w.value(d.clock_probe.count_from_ms);
+  w.key("inload_at_ms"); w.value(d.clock_probe.inload_at_ms);
   w.key("samples");
   w.begin_array();
   for (const auto& s : d.clock_probe.samples) {
@@ -132,9 +132,9 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
     w.key("current_ghz"); w.value_fixed(s.current_ghz, 3);
     w.key("current_min"); w.value_fixed(s.current_min, 3);
     w.key("current_max"); w.value_fixed(s.current_max, 3);
-    w.key("counted_ghz"); w.value_fixed(s.counted_ghz, 3);
-    w.key("counted_min"); w.value_fixed(s.counted_min, 3);
-    w.key("counted_max"); w.value_fixed(s.counted_max, 3);
+    w.key("inload_ghz"); w.value_fixed(s.inload_ghz, 3);
+    w.key("inload_min"); w.value_fixed(s.inload_min, 3);
+    w.key("inload_max"); w.value_fixed(s.inload_max, 3);
     w.end_object();
   }
   w.end_array();
@@ -212,11 +212,12 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // JSON スキーマ (schema_version を変えたら UI 側のパーサも更新すること)
 //
 // {
-//   "schema_version": 6,
+//   "schema_version": 7,
 //   "benchmark_version": "0.1.0",
 //   "score_formula": "reference_ns / median_ns * 1000",
 //   "overall_score": 1234.567,          // 各テストスコアの幾何平均
-//   "valid": true, "cancelled": false,
+//   "valid": true, "cancelled": false, "interrupted": false, "interruption": "",
+//   "input": { "touches": 0, "touch_ms": [...] },   // 計測中の画面へのタッチ (判定には使わない)
 //   "config": { "warmup_runs": 1, "measured_runs": 5, "logical_cores": 8 },
 //   "build":  { "os", "arch", "compiler", "flags_profile", "flags", "optimized" },
 //   "device": { ...プラットフォーム層から渡された情報... },
@@ -240,10 +241,13 @@ void write_diagnostics(JsonWriter& w, const Diagnostics& d) {
 // schema 6 (benchmark 0.2.1): 要約をパートに分割 (summary_parts。summary_text は全パートをつないだもの)。
 //                             started_utc、diagnostics.clock_probe を追加。diagnostics.clusters[].measures[].kernel に
 //                             "sieve1m" / "matmul576" が加わった。device に OS のビルド (os_build など) が入る
+// schema 7 (benchmark 0.2.2): interrupted / interruption (前面を離れたなどの中断)、input (画面へのタッチの数と時刻)、
+//                             tests[].touches、diagnostics.clock_probe.inload_at_ms と samples[].inload_ghz / inload_min /
+//                             inload_max を追加。diagnostics.clock_probe.count_from_ms と samples[].counted_* を削除
 std::string to_json(const SuiteResult& r, bool pretty) {
   detail::JsonWriter w(pretty);
   w.begin_object();
-  w.key("schema_version"); w.value(6);
+  w.key("schema_version"); w.value(7);
   w.key("benchmark_version"); w.value(r.benchmark_version);
   w.key("started_utc"); w.value(r.started_utc);
   w.key("score_formula"); w.value("reference_ns / median_ns * 1000");
@@ -262,6 +266,13 @@ std::string to_json(const SuiteResult& r, bool pretty) {
   w.end_object();
   w.key("valid"); w.value(r.valid);
   w.key("cancelled"); w.value(r.cancelled);
+  w.key("interrupted"); w.value(r.interrupted);
+  w.key("interruption"); w.value(r.interruption);
+  w.key("input");
+  w.begin_object();
+  w.key("touches"); w.value(r.input.touches);
+  w.key("touch_ms"); write_int_array(w, r.input.touch_ms);
+  w.end_object();
 
   w.key("config");
   w.begin_object();
@@ -324,6 +335,7 @@ std::string to_json(const SuiteResult& r, bool pretty) {
     w.key("wait_ms"); w.value(t.wait_ms);
     w.key("recovered"); w.value(t.recovered);
     w.key("recovery_ghz"); w.value_fixed(t.recovery_ghz, 3);
+    w.key("touches"); w.value(t.touches);
     // 64bit 値は JavaScript/Swift の Double で精度落ちしないよう文字列で出す
     w.key("checksum"); w.value(std::to_string(t.checksum));
     w.key("expected_checksum"); w.value(std::to_string(t.expected_checksum));

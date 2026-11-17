@@ -6,9 +6,12 @@
     終端の行「END part i/n chars=N」で終わる。パートごとに別のファイルでも、1 つのファイルに
     続けて保存したものでもよい。同じ実行のパートを見出しでまとめ、欠けや切れを報告する。
   - 0.2.0: 分割していない 1 本の要約 (1 ファイル = 1 回の実行)。
+  - 0.2.2: 0.2.1 の書式に、中断 (scores の行の INTERRUPTED(理由))、input の行 (画面へのタッチ)、
+    テストの見出しの touches N、診断のクロックの比較の候補 (a)(b) (probe の行の inload) が加わった。
 
 見る観点: V2・V3・V7 (テストごとの時間、busy、回復待ち)、V21 (クラスタ別の単位の案)、
-V22 (状態を確かめるクロックの 2 つの求め方)。
+V22 (状態を確かめるクロックの求め方。0.2.1 は現行と counted、0.2.2 は現行と候補 (a)(b))、
+V25 (前面を離れたら無効になるか)、V26 (画面へのタッチの記録)。
 
 解釈できない行は「?? 」を付けて出す。読み飛ばす行 (columns:、行列サイズ掃引の表など) は、既知の行として扱う。
 
@@ -94,11 +97,9 @@ def split_runs(paths):
 KNOWN_LINES = [
     re.compile(r"^$"),
     re.compile(r"^MobileBench v\S+ \| app .*"),  # 0.2.0 の見出し (0.2.1 以降は split_runs が読む)
-    re.compile(r"^scores .* valid=(yes|no)( CANCELLED)? cores=\d+ diag=(yes|no)$"),
     re.compile(r"^columns: run time cpu .*"),
     re.compile(r"^cond: only keys that differ from cond\(base\) .*"),
     re.compile(r"^\[diagnostics\]( cond .* -> .*)?$"),
-    re.compile(r"^  probe \d+ samples: current mean .* \| counted mean .*"),
     re.compile(r"^  cluster: kernel threads ms/unit .*"),
     re.compile(r"^  n +ws1T +wsMT +1T_GF@GHz\(cpu\) +MT_GF@GHz +MT/1T +worker_units$"),
     # 行列サイズ掃引の行: n ws1T wsMT 1T_GF@GHz(cpu) MT_GF@GHz MT/1T [worker_units]
@@ -140,6 +141,17 @@ def parse(key, run, lines):
         if m:
             out["os"] = m.group(1)
             continue
+        m = re.match(r"scores (.*) valid=(yes|no)( CANCELLED)?(?: INTERRUPTED\((\S*)\))? cores=(\d+) diag=(yes|no)$", ln)
+        if m:
+            out["valid"] = m.group(2) == "yes"
+            out["cancelled"] = bool(m.group(3))
+            out["interrupted"] = m.group(4)  # None = 中断なし
+            continue
+        m = re.match(r"input touches (\d+)((?: at_ms \d+)?(?: \d+)*)$", ln)
+        if m:  # 0.2.2 以降
+            out["touches"] = int(m.group(1))
+            out["touch_ms"] = [int(x) for x in m.group(2).replace(" at_ms", "").split()]
+            continue
         m = re.match(r"cond\(base\) (.*)", ln)
         if m:
             out["cond_base"] = parse_conditions(m.group(1))
@@ -157,7 +169,7 @@ def parse(key, run, lines):
             continue
         m = re.match(
             r"\[(peak|sustained) (\S+)\] median ([\d.]+)ms score ([\d.]+) threads (\d+) @([\d.]+)G spread ([\d.]+)%"
-            r"( UNSTABLE)? attempts (\d+)(?: wait (\d+)ms(\(NOT recovered\))? rec ([\d.]+)G)?",
+            r"( UNSTABLE)? attempts (\d+)(?: wait (\d+)ms(\(NOT recovered\))? rec ([\d.]+)G)?(?: touches (\d+))?",
             ln,
         )
         if m:
@@ -166,7 +178,8 @@ def parse(key, run, lines):
                 "threads": int(m.group(5)), "ghz": float(m.group(6)), "spread": float(m.group(7)),
                 "unstable": bool(m.group(8)), "attempts": int(m.group(9)),
                 "wait": int(m.group(10)) if m.group(10) else None, "not_recovered": bool(m.group(11)),
-                "rec": float(m.group(12)) if m.group(12) else None, "runs": [],
+                "rec": float(m.group(12)) if m.group(12) else None,
+                "touches": int(m.group(13)) if m.group(13) else 0, "runs": [],
             }
             out["tests"].append(cur)
             continue
@@ -210,11 +223,17 @@ def parse(key, run, lines):
         if m:
             out["probe_rest"], out["probe_load"], out["probe_workers"] = (int(m.group(i)) for i in (1, 2, 3))
             continue
-        m = re.match(r"    (\d+)ms current ([\d.]+) \(([\d.]+)-([\d.]+)\) counted ([\d.]+) \(([\d.]+)-([\d.]+)\)", ln)
+        # 0.2.1 は current と counted、0.2.2 以降は current と inload (候補 (b))
+        m = re.match(r"    (\d+)ms current ([\d.]+) \(([\d.]+)-([\d.]+)\) (counted|inload) ([\d.]+) \(([\d.]+)-([\d.]+)\)$", ln)
         if m:
-            v = [float(m.group(i)) for i in range(2, 8)]
+            v = [float(m.group(i)) for i in (2, 3, 4, 6, 7, 8)]
+            other = m.group(5)
             out["probe"].append({"t": int(m.group(1)), "current": v[0], "current_min": v[1], "current_max": v[2],
-                                 "counted": v[3], "counted_min": v[4], "counted_max": v[5]})
+                                 "kind": other, other: v[3], other + "_min": v[4], other + "_max": v[5]})
+            continue
+        m = re.match(r"  probe (\d+) samples: current mean .*", ln)
+        if m:  # 集計の行。値は各回の行から求め直す (report)
+            out["probe_summary_samples"] = int(m.group(1))
             continue
         m = re.match(r"  cpu(\S+) max(\d+|\?) cap(\d+|\?):", ln)
         if m:
@@ -265,6 +284,15 @@ def report(r):
         return
     print(f"topology max_mhz {r['max_mhz']} | capacity {r['capacity']}")
     print(f"baseline {r['baseline']} | precondition {r['precondition_ms']}ms -> {r['precondition_ghz']} {r['settled']}")
+    status = "valid" if r.get("valid") else "INVALID"
+    if r.get("cancelled"):
+        status += " CANCELLED"
+    if r.get("interrupted") is not None:
+        status += f" INTERRUPTED({r['interrupted']})"
+    print(f"result {status}")
+    if "touches" in r:  # 0.2.2 以降 (V26)
+        by_test = ", ".join(f"{t['phase']} {t['id']} {t['touches']}" for t in r["tests"] if t["touches"])
+        print(f"input touches {r['touches']} at_ms {r['touch_ms']} | tests with touches: {by_test or '-'}")
     caps = {run["cap"] for t in r["tests"] for run in t["runs"]}
     print("cap (scaling_max_freq) の種類:", caps, *(["((max) = 最大周波数と同じ)"] if "(max)" in caps else []))
     print()
@@ -318,10 +346,21 @@ def report(r):
     if r["probe"]:
         print(f"-- 状態を確かめるクロック (V22): rest {r.get('probe_rest')}ms load {r.get('probe_load')}ms "
               f"workers {r.get('probe_workers')}")
-        cur_mean, cur_range = spread([p["current"] for p in r["probe"]])
-        cnt_mean, cnt_range = spread([p["counted"] for p in r["probe"]])
-        print(f"{len(r['probe'])} samples: current mean {cur_mean:.3f} range {cur_range:.1f}% | "
-              f"counted mean {cnt_mean:.3f} range {cnt_range:.1f}% (range = (max-min)/mean。目標は 2% 以内)")
+        n = len(r["probe"])
+        series = [("current", "current"), ("(a) current-max", "current_max")]
+        if all(p["kind"] == "inload" for p in r["probe"]):  # 0.2.2 以降
+            series += [("(b) inload", "inload"), ("inload-max", "inload_max")]
+        else:  # 0.2.1
+            series += [("counted", "counted")]
+        cols = []
+        for label, key in series:
+            values = [p[key] for p in r["probe"] if p.get(key, 0) > 0]
+            if values:
+                mean, rng = spread(values)
+                cols.append(f"{label} mean {mean:.3f} range {rng:.1f}%")
+        print(f"{n} samples: " + " | ".join(cols) + " (range = (max-min)/mean。目標は 2% 以内)")
+        if r.get("probe_summary_samples") not in (None, n):
+            print(f"!! probe の集計の行は {r['probe_summary_samples']} 個、各回の行は {n} 個")
         print()
     print("-- クラスタ")
     for c in r["clusters"]:

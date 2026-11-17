@@ -34,6 +34,13 @@ import zipfile
 KERNEL_PATTERNS = [
     "count_primes_segmented",
     "matmul_blocked",
+    # 固定時間方式の行列積の片 (docs/PHASE1_PLAN.md P3.4)。スコア対象の手順が使い始める (0.3.0) までは、
+    # アプリのどこからも参照されない。その間は、.so の一覧に出なくても誤りではない。
+    # matmul_piece は、コンパイラによって呼び出し元の MatmulPieceKernel::run_unit に展開される
+    # (手元の clang 18.1.3 の x86_64 では展開され、GCC 13.3.0 では展開されなかった)。
+    # 展開されると、実行されるループは run_unit の中にあるので、両方の位置を出す
+    "matmul_piece",
+    "MatmulPieceKernel::run_unit",
 ]
 
 SO_NAME = "libmobilebench_jni.so"

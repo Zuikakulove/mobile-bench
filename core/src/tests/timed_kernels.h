@@ -5,6 +5,11 @@
 //
 // 現行の UnitKernel (unit_based_test.h) は、スコア対象の手順が使っているので残してある。
 // 固定時間方式への切り替え (0.3.0) で、こちらに一本化する。
+//
+// このファイルと timed_kernels.cpp は、切り替えまで、アプリのどこからも参照されない。
+// 既存のソース (cpu_kernels.h、cpu_matmul.cpp、cpu_sieve.cpp) には手を入れていない。
+// 0.2.2 のままのビルドで、スコア対象のカーネルの機械語と位置が変わらないようにするためである
+// (位置が変わると、遅いコアの篩が約 3 割動いた例がある。docs/DESIGN.md §1.8 (4))。
 #pragma once
 
 #include <cstdint>
@@ -38,6 +43,11 @@ class TimedKernel {
 //
 // 1 単位 = [0, limit) の素数を数える 1 回。1 単位が、そのまま照合 1 回になる。
 // スコア対象は limit = kSieveUnitLimit (1,000,000)。区間の大きさ (32 KiB) は、現行の単位と同じ。
+
+// 固定時間方式の単位 (docs/DESIGN.md §4-Q5 の判断 1。docs/PHASE1_PLAN.md P3.1)
+inline constexpr std::uint32_t kSieveUnitLimit = 1'000'000;
+inline constexpr std::uint64_t kSieveUnitPrimeCount = 78'498;  // pi(1,000,000)
+
 class SieveTimedKernel final : public TimedKernel {
  public:
   explicit SieveTimedKernel(std::uint32_t limit = kSieveUnitLimit, std::uint64_t expected = kSieveUnitPrimeCount)
@@ -76,6 +86,14 @@ class SieveTimedKernel final : public TimedKernel {
 //   - 行ブロックの最後の片の後に、その行 block 本ぶんの重み付き総和を足し込む
 //   - 行列積 1 回が完成したら、足し込んだ値を正解と照合する
 // 窓の終わりで途中の行列積は、finish が計測の外で最後まで実行して照合する。
+
+// 固定時間方式の単位 (§4-Q5 の判断 2。P3.1): n=576 では 9 × 9 = 81 片
+inline constexpr int kMatmulPieceCount = (kMatmulSize / kMatmulBlock) * (kMatmulSize / kMatmulBlock);
+static_assert(kMatmulSize % kMatmulBlock == 0 && kMatmulPieceCount == 81, "matmul unit is 1/81 of n=576");
+
+// 重み付き総和 sum_ij w_i * C_ij * v_j (matmul_checksum と同じもの) を、行 [i0, i1) だけについて求める。
+// 行の範囲を重ならないように分けて足すと (符号なし 64 ビットの加算)、matmul_checksum の値と一致する
+std::uint64_t matmul_checksum_rows(const double* c, int n, int i0, int i1);
 
 // C の行 [ii, ii + block) に、A の列 [kk, kk + block) と B の行 [kk, kk + block) の積を足し込む。
 // 内側のループは matmul_blocked (cpu_matmul.cpp) と同じ形にしてある。

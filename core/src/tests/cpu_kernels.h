@@ -18,10 +18,6 @@ inline constexpr std::uint32_t kSieveLimit = 40'000'000;       // [0, limit) の
 inline constexpr std::uint64_t kSievePrimeCount = 2'433'654;   // pi(40,000,000)
 inline constexpr std::uint32_t kSieveSegmentBytes = 32 * 1024;
 
-// 固定時間方式の単位 (docs/DESIGN.md §4-Q5 の判断 1。docs/PHASE1_PLAN.md P3.1)。区間の大きさは上と同じ
-inline constexpr std::uint32_t kSieveUnitLimit = 1'000'000;
-inline constexpr std::uint64_t kSieveUnitPrimeCount = 78'498;  // pi(1,000,000)
-
 struct SieveScratch {
   std::vector<std::uint8_t> segment;
   std::vector<std::uint8_t> small;
@@ -58,18 +54,10 @@ class SieveKernel final : public UnitKernel {
 inline constexpr int kMatmulSize = 576;  // N x N (ブロックサイズの倍数)
 inline constexpr int kMatmulBlock = 64;
 
-// 固定時間方式の単位 (§4-Q5 の判断 2。P3.1): 行列積 1 回を、外側 2 重のブロックの 1 組
-// (行 kMatmulBlock 本ぶん × 中間の添字 kMatmulBlock 個ぶん) に分けた 1 片。n=576 では 9 × 9 = 81 片
-inline constexpr int kMatmulPieceCount = (kMatmulSize / kMatmulBlock) * (kMatmulSize / kMatmulBlock);
-static_assert(kMatmulSize % kMatmulBlock == 0 && kMatmulPieceCount == 81, "matmul unit is 1/81 of n=576");
-
 // C = A * B (C は事前にゼロであること)
 void matmul_blocked(const double* a, const double* b, double* c, int n, int block);
 // 重み付き総和 sum_ij w_i * C_ij * v_j を整数として返す
 std::uint64_t matmul_checksum(const double* c, int n);
-// 同じ重み付き総和を、行 [i0, i1) だけについて求める。行の範囲を重ならないように分けて足すと
-// (符号なし 64 ビットの加算)、matmul_checksum の値と一致する
-std::uint64_t matmul_checksum_rows(const double* c, int n, int i0, int i1);
 // A, B の内容から重み付き総和の正解を O(n^2) で求める
 std::uint64_t matmul_expected_checksum(const double* a, const double* b, int n);
 void matmul_fill_inputs(double* a, double* b, int n);

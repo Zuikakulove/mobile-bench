@@ -56,6 +56,29 @@ std::uint64_t SieveTimedKernel::observed_checksum(int worker) const {
 
 // ---- 行列積の片 ----------------------------------------------------------------
 
+namespace {
+
+// 照合の重み。cpu_matmul.cpp の row_weight / col_weight と同じ値であること。
+// cpu_matmul.cpp を変えないために、ここにも置いてある (ファイルの冒頭の説明)。食い違えば、
+// ユニットテスト (matmul_checksum_rows_adds_up_to_whole) と、カーネルの照合が失敗する
+inline int row_weight(int i) { return (i % 7) + 1; }
+inline int col_weight(int j) { return (j % 5) + 1; }
+
+}  // namespace
+
+// matmul_checksum (cpu_matmul.cpp) の行の範囲を限ったもの。
+// 行ごとの和も、行の範囲の和も 2^53 未満の整数なので、範囲ごとの値を整数で足すと全体の値になる
+std::uint64_t matmul_checksum_rows(const double* c, int n, int i0, int i1) {
+  double sum = 0.0;
+  for (int i = i0; i < i1; ++i) {
+    double row = 0.0;
+    const double* c_row = c + static_cast<size_t>(i) * n;
+    for (int j = 0; j < n; ++j) row += c_row[j] * col_weight(j);
+    sum += row * row_weight(i);
+  }
+  return static_cast<std::uint64_t>(static_cast<std::int64_t>(sum));
+}
+
 // 内側の 4 重ループ (jj、i、k、j) は matmul_blocked と同じ形。入口の launder と出口の clobber_memory も同じ
 void matmul_piece(const double* a, const double* b, double* c, int n, int block, int ii, int kk) {
   launder(n);

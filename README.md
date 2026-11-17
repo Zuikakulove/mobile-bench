@@ -57,6 +57,8 @@ ios/                                SwiftUI
   core-test.yml                     Linux (GCC / clang) で core のユニットテスト
   android.yml                       デバッグ APK をビルドして Artifacts にアップロード
   ios.yml                           XcodeGen → 署名なしでシミュレータ向けビルド
+  kernel-layout.yml                 一度だけの比較: build 12 / 15 を作り直し、実機で使った APK と比べる
+.github/scripts/                    CI の検査 (バージョンの一致、JNI、カーネルの位置、Swift のパーサ)
 ```
 
 ## 計測ルール
@@ -216,11 +218,12 @@ CLI でも `mobilebench_cli --diagnostics` で同じ計測ができます。
 
 | ワークフロー | 実行条件 | 内容 |
 |---|---|---|
-| `core-test.yml` | `core/` の変更 | Ubuntu 上で GCC と clang の両方でビルドし、ユニットテストと全テストの実行（チェックサム確認）を行う |
-| `android.yml` | `android/` または `core/` の変更、手動 | デバッグ APK をビルドし、Artifacts に `MobileBench-debug-apk` としてアップロード（30 日保持） |
-| `ios.yml` | `ios/` または `core/` の変更、手動 | Apple clang で core のユニットテスト → XcodeGen → 署名なしでシミュレータ向けにビルド |
+| `core-test.yml` | `core/`、`docs/measurements/tools/`、`.github/scripts/` の変更 | Ubuntu 上で GCC と clang の両方でビルドし、ユニットテストと全テストの実行（チェックサム確認）を行う。3 か所のバージョンの一致を検査する。`analyze_summary.py` に保存済みの記録と CLI の要約を読ませる（0.2.1 の記録と CLI の要約は `--strict`） |
+| `android.yml` | `android/`、`core/`、`.github/scripts/` の変更、手動 | バージョンの一致と JNI の宣言（関数名・シグネチャ）を検査し、デバッグ APK をビルドして Artifacts に `MobileBench-debug-apk` としてアップロード（30 日保持）。CLI の JSON を Kotlin のパーサに読ませるユニットテストを実行し、カーネルの関数とループの位置を `kernel-layout` として上げる（90 日保持） |
+| `ios.yml` | `ios/`、`core/` の変更、手動 | ランナーは `macos-26`、Xcode 26.6（ビルド 17F113）を選び、違う版なら失敗する。バージョンの一致を検査し、Apple clang で core のユニットテスト → CLI の JSON を Swift のパーサに読ませる → XcodeGen → 署名なしでシミュレータ向けにビルド |
+| `kernel-layout.yml` | 自身と `kernel_layout.py` の変更、手動 | 一度だけの比較（`docs/DESIGN.md` §6 C8）。build 12 と build 15 のコミットをビルドし直し、実機で使った APK の `.so` と比べる |
 
-どれも、Actions タブでワークフローを選んで「Run workflow」を押せば手動でも実行できます。
+どれも、Actions タブでワークフローを選んで「Run workflow」を押せば手動でも実行できます（`main` に入っているワークフローに限る）。
 
 ### 開発環境についての注意
 

@@ -12,8 +12,12 @@ on:
       - "android/**"
       - "core/**"
       - ".github/workflows/android.yml"
+      - ".github/scripts/**"
   # スマホの GitHub 画面 (Actions → Android → Run workflow) から手動実行もできる
   workflow_dispatch:
+
+env:
+  NDK_VERSION: "27.2.12479018"
 
 jobs:
   build:
@@ -23,6 +27,14 @@ jobs:
         working-directory: android
     steps:
       - uses: actions/checkout@v4
+
+      - name: Check versions (version.h / build.gradle.kts / project.yml)
+        working-directory: .
+        run: python3 -I .github/scripts/check_versions.py
+
+      - name: Check JNI declarations (NativeBench.kt / jni_bridge.cpp)
+        working-directory: .
+        run: python3 -I .github/scripts/check_jni.py
 
       - uses: actions/setup-java@v4
         with:
@@ -37,7 +49,16 @@ jobs:
           SDKMANAGER="$(ls -d "${ANDROID_HOME}"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -n 1)"
           echo "Using ${SDKMANAGER}"
           yes | "${SDKMANAGER}" --licenses > /dev/null || true
-          "${SDKMANAGER}" --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018" "cmake;3.22.1"
+          "${SDKMANAGER}" --install "platforms;android-35" "build-tools;35.0.0" "ndk;${NDK_VERSION}" "cmake;3.22.1"
+
+      - name: Build core CLI for the host and write a diagnostics JSON
+        # Kotlin のパーサのテスト (testDebugUnitTest) に読ませる JSON (docs/PHASE1_PLAN.md J7 の 2)
+        working-directory: .
+        run: |
+          cmake -S core -B build-host -DCMAKE_BUILD_TYPE=Release -DMB_BUILD_TESTS=OFF
+          cmake --build build-host --parallel --target mobilebench_cli
+          ./build-host/mobilebench_cli --only cpu.single.sieve --diagnostics --quiet > "${RUNNER_TEMP}/cli-diagnostics.json"
+          echo "MB_CLI_JSON=${RUNNER_TEMP}/cli-diagnostics.json" >> "$GITHUB_ENV"
 
       - uses: gradle/actions/setup-gradle@v4
 
@@ -45,9 +66,46 @@ jobs:
         # app/build.gradle.kts が GITHUB_RUN_NUMBER を versionCode (ビルド番号) に使う
         run: ./gradlew assembleDebug --stacktrace
 
+      - name: Unit tests (Kotlin parser reads the CLI JSON)
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Verify the parser test ran (not skipped)
+        # MB_CLI_JSON が渡らずにテストが飛ばされると、検査が空振りになるので確かめる
+        run: |
+          python3 -I - app/build/test-results/testDebugUnitTest <<'EOF'
+          import glob, sys, xml.etree.ElementTree as ET
+          files = glob.glob(sys.argv[1] + "/TEST-com.mobilebench.app.bench.BenchmarkResultParseTest.xml")
+          if not files:
+              sys.exit("BenchmarkResultParseTest の結果がない")
+          s = ET.parse(files[0]).getroot()
+          print({k: s.get(k) for k in ("tests", "skipped", "failures", "errors")})
+          if int(s.get("tests")) < 1 or int(s.get("skipped")) != 0 or int(s.get("failures")) or int(s.get("errors")):
+              sys.exit("BenchmarkResultParseTest が実行されていない (飛ばされた) か、失敗した")
+          print("OK: BenchmarkResultParseTest ran and passed")
+          EOF
+
       - name: Verify core compile flags (-O2)
         working-directory: .
         run: python3 .github/scripts/check_android_flags.py
+
+      - name: Kernel layout (arm64-v8a)
+        # カーネルの関数とループの位置を残す (docs/DESIGN.md §6 C8)。APK に入る .so と .text が同じことも確かめる
+        working-directory: .
+        run: |
+          mkdir -p android/dist-layout
+          python3 -I .github/scripts/kernel_layout.py \
+            --search-dir android/app/build/intermediates \
+            --apk android/app/build/outputs/apk/debug/app-debug.apk \
+            --tools-dir "${ANDROID_HOME}/ndk/${NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin" \
+            --label "Android run ${GITHUB_RUN_NUMBER} (${GITHUB_SHA::7})" \
+            --out android/dist-layout/kernel-layout-b${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernel-layout
+          path: android/dist-layout/*.txt
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Rename APK
         id: apk

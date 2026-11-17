@@ -6,21 +6,47 @@ on:
       - "ios/**"
       - "core/**"
       - ".github/workflows/ios.yml"
+      - ".github/scripts/check_versions.py"
+      - ".github/scripts/swift_parse_check/**"
   pull_request:
     paths:
       - "ios/**"
       - "core/**"
       - ".github/workflows/ios.yml"
+      - ".github/scripts/check_versions.py"
+      - ".github/scripts/swift_parse_check/**"
   workflow_dispatch:
+
+# Xcode の版を固定する (docs/DESIGN.md §1.5-2、§6 C6、docs/PHASE1_PLAN.md J8)。
+# ランナーの既定が変わってコンパイラが黙って変わるのを防ぐ。GitHub がイメージの Xcode を入れ替えて
+# 下の値と違えば、CI は失敗する。そのときは、確かめたうえで値を直す PR を出す。
+env:
+  XCODE_APP: /Applications/Xcode_26.6.app
+  EXPECTED_XCODE_VERSION: "Xcode 26.6"
+  EXPECTED_XCODE_BUILD: "Build version 17F113"
 
 jobs:
   simulator-build:
-    runs-on: macos-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Check versions (version.h / build.gradle.kts / project.yml)
+        run: python3 -I .github/scripts/check_versions.py
+
+      - name: Select and verify Xcode
+        run: |
+          sudo xcode-select -s "$XCODE_APP"
+          actual="$(xcodebuild -version)"
+          echo "$actual"
+          expected="$(printf '%s\n%s' "$EXPECTED_XCODE_VERSION" "$EXPECTED_XCODE_BUILD")"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::xcodebuild -version is not the expected one (expected: $EXPECTED_XCODE_VERSION / $EXPECTED_XCODE_BUILD)"
+            exit 1
+          fi
+          xcode-select -p
+          clang --version
+          xcrun swiftc --version
 
       - name: Core unit tests (Apple clang)
         # Android と同じ core を Apple clang でもテストし、チェックサムの一致を確認する
@@ -28,6 +54,24 @@ jobs:
           cmake -S core -B build-core -DCMAKE_BUILD_TYPE=Release
           cmake --build build-core --parallel
           ctest --test-dir build-core --output-on-failure
+
+      - name: Swift parser check (CLI JSON -> BenchmarkResult.swift)
+        # core の CLI の JSON (診断モードあり) を、アプリのパーサに読ませる (docs/PHASE1_PLAN.md J7 の 3)
+        run: |
+          mkdir -p build-swift-check
+          ./build-core/mobilebench_cli --only cpu.single.sieve --diagnostics --quiet > build-swift-check/cli-diagnostics.json
+          xcrun swiftc -swift-version 5 \
+            ios/MobileBench/Model/BenchmarkResult.swift .github/scripts/swift_parse_check/main.swift \
+            -o build-swift-check/swift_parse_check
+          ./build-swift-check/swift_parse_check build-swift-check/cli-diagnostics.json
+          # 検査が空振りしていないことの確認: 必須のキー (tests[].median_ns) を消した JSON は読めないこと
+          python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); [t.pop("median_ns") for t in d["tests"]]; json.dump(d, open(sys.argv[2], "w"))' \
+            build-swift-check/cli-diagnostics.json build-swift-check/broken.json
+          if ./build-swift-check/swift_parse_check build-swift-check/broken.json; then
+            echo "::error::swift_parse_check accepted a JSON without tests[].median_ns"
+            exit 1
+          fi
+          echo "OK: the broken JSON was rejected"
 
       - name: Install XcodeGen
         run: brew install xcodegen
